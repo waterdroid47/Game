@@ -51,10 +51,11 @@ Every texture has a key (`cell`, `virus`, `boss`, `chest`, …). To use real art
 
 ## Publishing
 
-**Web (now):** every push to `main` builds and deploys to GitHub Pages using `.github/workflows/deploy.yml`.
-1. Turn it on once: **Settings → Pages → Source: GitHub Actions**.
-2. The game will then be at `https://waterdroid47.github.io/game/`.
-3. On your phone, open the link and choose "Add to Home screen" to install it.
+**Web (now):** the game is hosted on [Netlify](https://www.netlify.com), using the settings in `netlify.toml`.
+1. Every push to `main` builds and deploys automatically.
+2. Every pull request gets its own preview link.
+3. The site link is in the Netlify dashboard. You can rename it under **Site configuration → Change site name**.
+4. On your phone, open the link and choose "Add to Home screen" to install it.
 
 **Google Play (next step):** real ads and payments only work in a store app.
 1. Add Capacitor:
