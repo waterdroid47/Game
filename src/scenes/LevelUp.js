@@ -4,6 +4,10 @@ import { rollCards } from '../data/upgrades.js';
 import { Monetization } from '../services/monetization.js';
 import { button, text } from '../ui/widgets.js';
 
+const TAKE_ALL_Y = H - 102;
+const CARDS_TOP = 146;
+const CARDS_BOTTOM = TAKE_ALL_Y - 20 - 10; // button half-height + border/margin
+
 // Overlay shown on level-up or when catching a bonus chest: pick 1 of 3 (or 4) cards.
 export default class LevelUp extends Phaser.Scene {
   constructor() {
@@ -13,6 +17,7 @@ export default class LevelUp extends Phaser.Scene {
   create(data) {
     this.game_ = this.scene.get('Game');
     this.chosen = false;
+    this.adBusy = false;
     this.add.rectangle(0, 0, W, H, 0x000000, 0.72).setOrigin(0).setInteractive();
     const chest = data.source === 'chest';
     const title = text(this, W / 2, 92, chest ? 'BONUS CHEST!' : 'LEVEL UP!', 32, chest ? '#ffd23f' : '#7dff7a');
@@ -21,22 +26,42 @@ export default class LevelUp extends Phaser.Scene {
     this.cards = this.add.container(0, 0);
     this.renderCards(data.picks);
 
-    const reroll = button(this, W / 2, H - 56, 230, 42, 'REROLL  (watch ad)', async () => {
-      if (!(await Monetization.showRewardedAd('reroll'))) return;
+    if (!this.game_.takeAllUsed) {
+      button(this, W / 2, TAKE_ALL_Y, 230, 40, 'TAKE ALL  (watch ad)', () => this.withAd('take_all', () => {
+        this.game_.takeAllUsed = true;
+        this.chosen = true;
+        this.picks.forEach((p) => this.game_.applyChoice(p));
+        this.finish();
+      }), { color: 0xc77d00, size: 14 });
+    }
+
+    const reroll = button(this, W / 2, H - 50, 230, 40, 'REROLL  (watch ad)', () => this.withAd('reroll', () => {
       reroll.setEnabled(false).setLabel('REROLLED');
       this.renderCards(rollCards(this.game_, data.picks.length));
-    }, { color: 0x8a6d00, size: 14 });
+    }), { color: 0x8a6d00, size: 14 });
 
     if (AUTOPLAY) this.time.delayedCall(150, () => this.choose(this.picks[0]));
+  }
+
+  // Shows a rewarded ad; card taps are ignored while it is open, and the reward is
+  // only given if no card was picked in the meantime.
+  async withAd(placement, onReward) {
+    if (this.chosen || this.adBusy) return;
+    this.adBusy = true;
+    const ok = await Monetization.showRewardedAd(placement);
+    this.adBusy = false;
+    if (ok && !this.chosen && this.sys.isActive()) onReward();
   }
 
   renderCards(picks) {
     this.picks = picks;
     this.cards.removeAll(true);
     const n = picks.length;
-    const ch = n >= 4 ? 88 : 104;
     const gap = 12;
-    const top = 330 - (n * ch + (n - 1) * gap) / 2;
+    // Fit all cards between the subtitle and the TAKE ALL button (4 cards get shorter).
+    const space = CARDS_BOTTOM - CARDS_TOP;
+    const ch = Math.min(104, Math.floor((space - (n - 1) * gap) / n));
+    const top = CARDS_TOP + (space - (n * ch + (n - 1) * gap)) / 2;
     picks.forEach((p, i) => {
       const y = top + i * (ch + gap) + ch / 2;
       const c = this.add.container(W / 2, y);
@@ -63,9 +88,13 @@ export default class LevelUp extends Phaser.Scene {
   }
 
   choose(p) {
-    if (this.chosen) return;
+    if (this.chosen || this.adBusy) return;
     this.chosen = true;
     this.game_.applyChoice(p);
+    this.finish();
+  }
+
+  finish() {
     this.scene.stop();
     this.scene.resume('Game');
   }

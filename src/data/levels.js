@@ -5,14 +5,14 @@ const NAMES = [
 ];
 const TINTS = [0xffffff, 0xff9a9a, 0xb0ffb8, 0xb8d8ff, 0xffe39a, 0xd0a070, 0xfff0e0, 0xff7070, 0xd0b0ff, 0xffb0e0];
 
+// Early levels: mostly basic viruses and slow tanks. Fast germs only from level 4.
 function poolFor(n) {
-  const pool = { virus: 6, germ: 3 };
-  if (n >= 2) pool.tank = 2;
-  if (n >= 3) pool.splitter = 2;
-  if (n >= 4) pool.shooter = 2;
-  if (n >= 6) { pool.tank = 3; pool.shooter = 3; pool.germ = 4; }
-  if (n >= 8) { pool.splitter = 3; pool.virus = 4; }
-  return pool;
+  if (n === 1) return { virus: 7, tank: 2 };
+  if (n === 2) return { virus: 7, tank: 3 };
+  if (n === 3) return { virus: 6, tank: 3, splitter: 2 };
+  if (n <= 5) return { virus: 6, tank: 3, splitter: 2, shooter: 2, germ: 2 };
+  if (n <= 7) return { virus: 5, tank: 3, splitter: 2, shooter: 3, germ: 3 };
+  return { virus: 4, tank: 3, splitter: 3, shooter: 3, germ: 4 };
 }
 
 export const LEVELS = NAMES.map((name, i) => {
