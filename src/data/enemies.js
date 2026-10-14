@@ -2,7 +2,9 @@
 // radius: hit radius in screen pixels. dmg: damage dealt when reaching the membrane.
 export const ENEMIES = {
   virus: { tex: 'virus', hp: 10, speed: 38, dmg: 8, xp: 1, coins: 1, radius: 14 },
-  germ: { tex: 'germ', hp: 6, speed: 64, dmg: 6, xp: 1, coins: 1, radius: 11, wobble: 40 },
+  germ: { tex: 'germ', hp: 6, speed: 64, dmg: 6, xp: 1, coins: 1, radius: 11, wobble: 40, oneHit: true },
+  // Slow side-to-side swimmer; always takes exactly 3 hits.
+  drifter: { tex: 'drifter', hp: 3, hits: 3, speed: 24, dmg: 10, xp: 2, coins: 2, radius: 16, wobble: 75, wobbleSpeed: 1.3 },
   tank: { tex: 'tank', hp: 45, speed: 18, dmg: 16, xp: 3, coins: 3, radius: 16 },
   splitter: { tex: 'splitter', hp: 20, speed: 28, dmg: 10, xp: 2, coins: 2, radius: 14, split: { into: 'mini', count: 2 } },
   mini: { tex: 'mini', hp: 5, speed: 54, dmg: 4, xp: 1, coins: 0, radius: 9, wobble: 25 },

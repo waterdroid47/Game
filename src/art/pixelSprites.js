@@ -70,6 +70,20 @@ const SPRITES = {
       '...tttt...',
     ],
   },
+  drifter: {
+    pal: { c: '#9ff7e0', p: '#0f6e5a', P: '#3fd1a8', w: '#d8fff2', n: '#1a4a8a', N: '#5a8aff' },
+    rows: [
+      '.c.c.c.c.c.c..',
+      '..pppppppppp..',
+      '.pPPwwPPPPPPp.',
+      'pPPwPPPPnnPPPp',
+      'pPPPPPPnNNnPPp',
+      'pPPPPPPPnnPPPp',
+      '.pPPPPPPPPPPp.',
+      '..pppppppppp..',
+      '.c.c.c.c.c.c..',
+    ],
+  },
   splitter: {
     pal: { b: '#1b4e9e', B: '#4aa8ff', w: '#e6f4ff', k: '#0b2550' },
     rows: [

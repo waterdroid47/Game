@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
-import { AUTOPLAY, DEBUG, H, MEMBRANE_Y, PLAYER_Y, SPEED, SPRITE_SCALE, W } from '../config.js';
+import { AUTOPLAY, DEBUG, H, MEMBRANE_Y, MOVE_TOP, PLAYER_Y, SPEED, SPRITE_SCALE, W } from '../config.js';
 import { ENEMIES } from '../data/enemies.js';
 import { LEVELS, xpFor } from '../data/levels.js';
 import { metaStats } from '../data/shop.js';
-import { CARDS, STANCES, STANCE_MAX, rollCards } from '../data/upgrades.js';
+import { CARDS, STANCES, STANCE_MAX, STANCE_STATS, canTake, rollCards } from '../data/upgrades.js';
 import { Monetization } from '../services/monetization.js';
 import { sfx } from '../systems/Audio.js';
 import WaveSpawner from '../systems/WaveSpawner.js';
@@ -13,7 +13,7 @@ const BASE_FIRE_RATE = 2.6;
 const CHEST_RADIUS = 16;
 const ENEMY_COLORS = {
   virus: 0xe0335a, germ: 0xffd23f, tank: 0x7fae3a, splitter: 0x4aa8ff, mini: 0x4aa8ff,
-  shooter: 0xff8a2a, elite: 0xc43cf0, boss: 0x56b53a,
+  shooter: 0xff8a2a, elite: 0xc43cf0, boss: 0x56b53a, drifter: 0x3fd1a8,
 };
 
 export default class Game extends Phaser.Scene {
@@ -86,6 +86,7 @@ export default class Game extends Phaser.Scene {
     this.player = this.physics.add.sprite(W / 2, PLAYER_Y, 'cell').setScale(SPRITE_SCALE).setDepth(7);
     this.player.body.setCircle(5, 1, 1);
     this.targetX = W / 2;
+    this.targetY = PLAYER_Y;
     this.tweens.add({ targets: this.player, scaleX: SPRITE_SCALE * 1.06, scaleY: SPRITE_SCALE * 0.94, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
 
     this.fx = this.add.particles(0, 0, 'px', {
@@ -97,23 +98,25 @@ export default class Game extends Phaser.Scene {
     this.laserGfx = this.add.graphics().setDepth(6);
     this.barGfx = this.add.graphics().setDepth(9);
 
-    // ----- input: slide anywhere to move -----
+    // ----- input: slide anywhere to move (left/right and up/down in the lower part) -----
     this.dragStart = null;
     this.input.on('pointerdown', (p) => {
-      this.dragStart = p.x;
-      this.dragFrom = this.targetX;
+      this.dragStart = { x: p.x, y: p.y };
+      this.dragFrom = { x: this.targetX, y: this.targetY };
     });
     this.input.on('pointermove', (p) => {
-      if (!p.isDown || this.dragStart === null) return;
-      this.targetX = Phaser.Math.Clamp(this.dragFrom + (p.x - this.dragStart) * 1.4, 16, W - 16);
+      if (!p.isDown || !this.dragStart) return;
+      this.targetX = Phaser.Math.Clamp(this.dragFrom.x + (p.x - this.dragStart.x) * 1.4, 16, W - 16);
+      this.targetY = Phaser.Math.Clamp(this.dragFrom.y + (p.y - this.dragStart.y) * 1.4, MOVE_TOP, PLAYER_Y);
     });
     this.input.on('pointerup', () => { this.dragStart = null; });
-    this.keys = this.input.keyboard?.addKeys('LEFT,RIGHT,A,D');
+    this.keys = this.input.keyboard?.addKeys('LEFT,RIGHT,UP,DOWN,A,D,W,S');
 
     // ----- collisions -----
     this.physics.add.overlap(this.bullets, this.enemies, this.onBulletHit, null, this);
     this.physics.add.overlap(this.missiles, this.enemies, (m) => this.explodeMissile(m), null, this);
     this.physics.add.overlap(this.player, this.enemyBullets, this.onPlayerShot, null, this);
+    this.physics.add.overlap(this.player, this.enemies, this.onPlayerTouchEnemy, null, this);
     this.physics.add.overlap(this.player, this.pickups, this.onPickup, null, this);
     this.physics.add.overlap(this.bullets, this.pickups, this.onBulletHitChest, null, this);
 
@@ -160,15 +163,23 @@ export default class Game extends Phaser.Scene {
   }
 
   updatePlayer(dt) {
-    if (AUTOPLAY) this.targetX = this.autoTarget();
+    if (AUTOPLAY) {
+      this.targetX = this.autoTarget();
+      this.targetY = PLAYER_Y;
+    }
     if (this.keys) {
-      if (this.keys.LEFT.isDown || this.keys.A.isDown) this.targetX -= 320 * dt;
-      if (this.keys.RIGHT.isDown || this.keys.D.isDown) this.targetX += 320 * dt;
+      const k = this.keys;
+      if (k.LEFT.isDown || k.A.isDown) this.targetX -= 320 * dt;
+      if (k.RIGHT.isDown || k.D.isDown) this.targetX += 320 * dt;
+      if (k.UP.isDown || k.W.isDown) this.targetY -= 320 * dt;
+      if (k.DOWN.isDown || k.S.isDown) this.targetY += 320 * dt;
       this.targetX = Phaser.Math.Clamp(this.targetX, 16, W - 16);
+      this.targetY = Phaser.Math.Clamp(this.targetY, MOVE_TOP, PLAYER_Y);
     }
     const p = this.player;
     const dx = this.targetX - p.x;
     p.x += dx * Math.min(1, dt * 16);
+    p.y += (this.targetY - p.y) * Math.min(1, dt * 16);
     p.rotation = Phaser.Math.Clamp(dx * 0.004, -0.25, 0.25);
     p.setAlpha(this.invuln > 0.2 ? 0.5 + 0.5 * Math.sin(this.time.now * 0.05) : 1);
   }
@@ -183,7 +194,7 @@ export default class Game extends Phaser.Scene {
     }
     let x = best ? best.x : W / 2;
     for (const b of this.enemyBullets.getChildren()) {
-      if (b.active && b.y > PLAYER_Y - 120 && b.y < PLAYER_Y && Math.abs(b.x - x) < 22) x += b.x < x ? 40 : -40;
+      if (b.active && b.y > this.player.y - 120 && b.y < this.player.y && Math.abs(b.x - x) < 22) x += b.x < x ? 40 : -40;
     }
     return Phaser.Math.Clamp(x, 16, W - 16);
   }
@@ -195,7 +206,8 @@ export default class Game extends Phaser.Scene {
     const s = this.stats;
     const L = this.stances;
     const px = this.player.x;
-    const py = PLAYER_Y - 16;
+    const pcy = this.player.y;
+    const py = pcy - 16;
     const hasTargets = this.spawner.alive > 0 || this.liveChests().length > 0;
     const rateF = s.fireRate / BASE_FIRE_RATE;
 
@@ -215,13 +227,11 @@ export default class Game extends Phaser.Scene {
     if (L.spread) {
       this.cd.spread -= dt;
       if (this.cd.spread <= 0 && hasTargets) {
-        this.cd.spread = Math.max(0.45, 1.6 - 0.12 * L.spread) / rateF;
-        const evolved = L.spread === STANCE_MAX;
-        const n = evolved ? 9 : 2 + L.spread;
-        const arc = 34 + 6 * L.spread;
-        for (let i = 0; i < n; i++) {
-          this.fireBullet(px, py, -90 - arc / 2 + (arc * i) / (n - 1), s.damage * 0.7, {
-            pierce: s.pierce + (evolved ? 1 : 0), tint: 0xffd23f, scale: 0.85,
+        const st = STANCE_STATS.spread(L.spread);
+        this.cd.spread = st.every / rateF;
+        for (let i = 0; i < st.shots; i++) {
+          this.fireBullet(px, py, -90 - st.arc / 2 + (st.arc * i) / (st.shots - 1), s.damage * 0.7, {
+            pierce: s.pierce + st.pierce, tint: 0xffd23f, scale: 0.85,
           });
         }
       }
@@ -230,18 +240,18 @@ export default class Game extends Phaser.Scene {
     // Laser
     this.laserGfx.clear();
     if (L.laser) {
-      const evolved = L.laser === STANCE_MAX;
+      const st = STANCE_STATS.laser(L.laser);
       if (this.laserTime > 0) {
         this.laserTime -= dt;
         this.laserTick -= dt;
-        const w = evolved ? 44 : 8 + 4 * L.laser;
+        const w = st.width;
         const flick = 0.75 + 0.25 * Math.sin(this.time.now * 0.08);
         this.laserGfx.fillStyle(0xff4df0, 0.3 * flick).fillRect(px - w / 2 - 4, 0, w + 8, py);
         this.laserGfx.fillStyle(0xff4df0, 0.75 * flick).fillRect(px - w / 2, 0, w, py);
         this.laserGfx.fillStyle(0xffffff, 0.9).fillRect(px - w / 6, 0, w / 3, py);
         if (this.laserTick <= 0) {
           this.laserTick = 0.1;
-          const dmg = s.damage * (0.5 + 0.15 * L.laser) * (evolved ? 1.5 : 1);
+          const dmg = s.damage * st.dmg;
           for (const e of this.liveEnemies()) {
             if (Math.abs(e.x - px) < w / 2 + e.def.radius && e.y < py) this.damageEnemy(e, dmg, false);
           }
@@ -252,8 +262,8 @@ export default class Game extends Phaser.Scene {
       } else {
         this.cd.laser -= dt;
         if (this.cd.laser <= 0 && hasTargets) {
-          this.cd.laser = evolved ? 1.2 : 3.8 - 0.4 * L.laser;
-          this.laserTime = 0.6 + 0.08 * L.laser;
+          this.cd.laser = st.every;
+          this.laserTime = st.duration;
           sfx.laser();
         }
       }
@@ -261,13 +271,12 @@ export default class Game extends Phaser.Scene {
 
     // Orbiting antibodies
     if (this.orbiters.length) {
-      const evolved = L.orbit === STANCE_MAX;
-      const R = evolved ? 56 : 44;
+      const st = STANCE_STATS.orbit(L.orbit);
       this.orbitAngle += dt * 2.8;
-      const dmg = s.damage * (1 + 0.25 * L.orbit);
+      const dmg = s.damage * st.dmg;
       this.orbiters.forEach((o, i) => {
         const a = this.orbitAngle + (i * Math.PI * 2) / this.orbiters.length;
-        o.setPosition(px + Math.cos(a) * R, PLAYER_Y + Math.sin(a) * R * 0.8);
+        o.setPosition(px + Math.cos(a) * st.radius, pcy + Math.sin(a) * st.radius * 0.8);
         for (const e of this.liveEnemies()) {
           if (e.orbitHitT > 0) continue;
           if (Phaser.Math.Distance.Between(o.x, o.y, e.x, e.y) < e.def.radius + 9) {
@@ -292,20 +301,21 @@ export default class Game extends Phaser.Scene {
     if (L.missile) {
       this.cd.missile -= dt;
       if (this.cd.missile <= 0 && hasTargets) {
+        const st = STANCE_STATS.missile(L.missile);
         const evolved = L.missile === STANCE_MAX;
-        this.cd.missile = evolved ? 1.0 : 2.8 - 0.3 * L.missile;
-        const n = evolved ? 4 : Math.ceil(L.missile / 2);
+        this.cd.missile = st.every;
+        const n = st.count;
+        const spacing = n > 4 ? 24 : 35;
         for (let i = 0; i < n; i++) {
           const m = this.missiles.get(px, py, 'missile');
           if (!m) break;
           m.enableBody(true, px, py, true, true);
           m.setScale(evolved ? 3 : 2.4).setDepth(6);
-          m.angle0 = (-90 + (i - (n - 1) / 2) * 35) * (Math.PI / 180);
-          m.heading = m.angle0;
+          m.heading = (-90 + (i - (n - 1) / 2) * spacing) * (Math.PI / 180);
           m.target = null;
           m.life = 4;
-          m.damage = s.damage * (2.5 + 0.6 * L.missile);
-          m.aoe = evolved ? 50 : 26;
+          m.damage = s.damage * st.dmg;
+          m.aoe = st.aoe;
         }
         sfx.missile();
       }
@@ -314,24 +324,24 @@ export default class Game extends Phaser.Scene {
     // Immune pulse
     if (L.pulse) {
       this.cd.pulse -= dt;
-      const evolved = L.pulse === STANCE_MAX;
-      const R = evolved ? 170 : 70 + 16 * L.pulse;
+      const st = STANCE_STATS.pulse(L.pulse);
+      const R = st.radius;
       if (this.cd.pulse <= 0 && this.liveEnemies().some((e) => this.distToPlayer(e) < R + 20)) {
-        this.cd.pulse = evolved ? 1.8 : 4.6 - 0.5 * L.pulse;
-        const dmg = s.damage * (1.6 + 0.6 * L.pulse);
+        this.cd.pulse = st.every;
+        const dmg = s.damage * st.dmg;
         for (const e of this.liveEnemies()) {
           if (this.distToPlayer(e) < R + e.def.radius) {
             this.damageEnemy(e, dmg, true);
-            if (evolved && !e.def.boss) e.knock = 220;
+            if (st.knock && !e.def.boss) e.knock = 220;
           }
         }
         for (const c of this.liveChests()) {
-          if (Phaser.Math.Distance.Between(px, PLAYER_Y, c.x, c.y) < R + CHEST_RADIUS) this.damageChest(c, dmg);
+          if (Phaser.Math.Distance.Between(px, pcy, c.x, c.y) < R + CHEST_RADIUS) this.damageChest(c, dmg);
         }
         for (const b of this.enemyBullets.getChildren()) {
-          if (b.active && Phaser.Math.Distance.Between(px, PLAYER_Y, b.x, b.y) < R) b.disableBody(true, true);
+          if (b.active && Phaser.Math.Distance.Between(px, pcy, b.x, b.y) < R) b.disableBody(true, true);
         }
-        const ring = this.add.circle(px, PLAYER_Y, R, 0x7dff7a, 0.12).setStrokeStyle(4, 0x7dff7a, 0.9).setDepth(6).setScale(0.1);
+        const ring = this.add.circle(px, pcy, R, 0x7dff7a, 0.12).setStrokeStyle(4, 0x7dff7a, 0.9).setDepth(6).setScale(0.1);
         this.tweens.add({ targets: ring, scale: 1, alpha: 0, duration: 380, ease: 'Cubic.out', onComplete: () => ring.destroy() });
         sfx.pulse();
       }
@@ -355,9 +365,9 @@ export default class Game extends Phaser.Scene {
 
   rebuildOrbiters() {
     this.orbiters.forEach((o) => o.destroy());
-    const n = this.stances.orbit === STANCE_MAX ? 6 : this.stances.orbit;
+    const n = STANCE_STATS.orbit(this.stances.orbit).count;
     this.orbiters = [];
-    for (let i = 0; i < n; i++) this.orbiters.push(this.add.image(this.player.x, PLAYER_Y, 'orbiter').setScale(2.6).setDepth(7));
+    for (let i = 0; i < n; i++) this.orbiters.push(this.add.image(this.player.x, this.player.y, 'orbiter').setScale(2.6).setDepth(7));
   }
 
   // ======================================================================
@@ -491,7 +501,8 @@ export default class Game extends Phaser.Scene {
     e.body.setCircle(r, e.width / 2 - r, e.height / 2 - r);
     e.def = def;
     e.type = type;
-    e.maxHp = e.hp = def.boss ? def.hp * this.level.hpMult : def.hp * hpMult;
+    // def.hits: dies after that many hits, whatever the damage.
+    e.maxHp = e.hp = def.hits ? def.hits : def.boss ? def.hp * this.level.hpMult : def.hp * hpMult;
     e.speed = def.speed * this.level.speedMult * Phaser.Math.FloatBetween(0.9, 1.1);
     e.baseX = def.boss ? W / 2 : x;
     e.t = Math.random() * 10;
@@ -527,7 +538,7 @@ export default class Game extends Phaser.Scene {
   }
 
   distToPlayer(e) {
-    return Phaser.Math.Distance.Between(this.player.x, PLAYER_Y, e.x, e.y);
+    return Phaser.Math.Distance.Between(this.player.x, this.player.y, e.x, e.y);
   }
 
   updateEnemies(dt) {
@@ -550,7 +561,7 @@ export default class Game extends Phaser.Scene {
         if (!def.boss && e.holdT > 10) e.holdY = null; // shooters eventually advance
       } else {
         e.y += e.speed * dt;
-        if (def.wobble) e.x = Phaser.Math.Clamp(e.baseX + Math.sin(e.t * 3) * def.wobble, 12, W - 12);
+        if (def.wobble) e.x = Phaser.Math.Clamp(e.baseX + Math.sin(e.t * (def.wobbleSpeed ?? 3)) * def.wobble, 12, W - 12);
       }
       if (def.shoot) {
         e.shootT -= dt;
@@ -578,7 +589,7 @@ export default class Game extends Phaser.Scene {
 
   enemyShoot(e) {
     const sh = e.def.shoot;
-    const base = Phaser.Math.Angle.Between(e.x, e.y, this.player.x, PLAYER_Y);
+    const base = Phaser.Math.Angle.Between(e.x, e.y, this.player.x, this.player.y);
     const n = sh.count;
     const spread = ((sh.spread || 0) * Math.PI) / 180;
     for (let i = 0; i < n; i++) {
@@ -616,7 +627,9 @@ export default class Game extends Phaser.Scene {
 
   damageEnemy(e, dmg, canCrit) {
     if (e.dying) return;
-    if (canCrit && Math.random() < this.stats.crit) {
+    if (e.def.oneHit) dmg = e.hp; // germs pop in one hit
+    else if (e.def.hits) dmg = 1; // counts hits, not damage
+    else if (canCrit && Math.random() < this.stats.crit) {
       dmg *= this.stats.critMult;
       this.floatText(e.x, e.y - 12, String(Math.round(dmg)), '#ffd23f');
     }
@@ -673,6 +686,20 @@ export default class Game extends Phaser.Scene {
   // ======================================================================
   // player health / xp / level-ups
   // ======================================================================
+  // Touching an enemy hurts: it bursts on the membrane of the cell (the boss just hurts).
+  onPlayerTouchEnemy(_p, e) {
+    if (!e.active || e.dying || this.invuln > 0 || this.dead || this.finished) return;
+    const dmg = e.def.dmg * this.level.dmgMult;
+    if (e.def.boss) {
+      this.hurtPlayer(dmg * 0.5);
+      this.invuln = Math.max(this.invuln, 1);
+      return;
+    }
+    this.burst(e.x, e.y, ENEMY_COLORS[e.type] ?? 0xffffff, 10);
+    this.removeEnemy(e);
+    this.hurtPlayer(dmg);
+  }
+
   onPlayerShot(_p, b) {
     if (!b.active) return;
     b.disableBody(true, true);
@@ -721,6 +748,8 @@ export default class Game extends Phaser.Scene {
   }
 
   applyChoice(choice) {
+    // Never go past a card's limit, even if the same card is applied twice.
+    if (!canTake(this, choice.kind, choice.id)) return false;
     if (choice.kind === 'stance') {
       this.stances[choice.id] = Math.min(STANCE_MAX, this.stances[choice.id] + 1);
       if (choice.id === 'orbit') this.rebuildOrbiters();
@@ -730,13 +759,14 @@ export default class Game extends Phaser.Scene {
       this.cardLevels[card.id] = (this.cardLevels[card.id] || 0) + 1;
     }
     this.refreshStanceIcons();
+    return true;
   }
 
   onDeath() {
     this.dead = true;
     this.physics.pause();
     this.laserGfx.clear();
-    this.burst(this.player.x, PLAYER_Y, 0x7dff7a, 40);
+    this.burst(this.player.x, this.player.y, 0x7dff7a, 40);
     this.player.setVisible(false);
     if (this.freeRevives > 0) {
       this.freeRevives -= 1;
@@ -772,7 +802,7 @@ export default class Game extends Phaser.Scene {
     this.hp = Math.round(this.stats.maxHp * 0.6);
     for (const b of this.enemyBullets.getChildren()) if (b.active) b.disableBody(true, true);
     for (const e of this.liveEnemies()) {
-      if (!e.def.boss && e.y > PLAYER_Y - 260) {
+      if (!e.def.boss && e.y > this.player.y - 260) {
         this.burst(e.x, e.y, 0x7dff7a, 6);
         this.removeEnemy(e);
       }
@@ -781,7 +811,7 @@ export default class Game extends Phaser.Scene {
     this.invuln = 2.5;
     this.dead = false;
     this.physics.resume();
-    const ring = this.add.circle(this.player.x, PLAYER_Y, 260, 0x7dff7a, 0.2).setDepth(6).setScale(0.1);
+    const ring = this.add.circle(this.player.x, this.player.y, 260, 0x7dff7a, 0.2).setDepth(6).setScale(0.1);
     this.tweens.add({ targets: ring, scale: 1, alpha: 0, duration: 500, onComplete: () => ring.destroy() });
   }
 
@@ -866,7 +896,7 @@ export default class Game extends Phaser.Scene {
     }
     // Small health bars over tough enemies.
     for (const e of this.liveEnemies()) {
-      if (e.def.boss || e.hp >= e.maxHp || e.maxHp < 30) continue;
+      if (e.def.boss || e.hp >= e.maxHp || (e.maxHp < 30 && !e.def.hits)) continue;
       const w = 26;
       bg.fillStyle(0x000000, 0.8).fillRect(e.x - w / 2 - 1, e.y - e.displayHeight / 2 - 8, w + 2, 5);
       bg.fillStyle(0xff3b5c, 1).fillRect(e.x - w / 2, e.y - e.displayHeight / 2 - 7, (w * e.hp) / e.maxHp, 3);

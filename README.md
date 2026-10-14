@@ -2,8 +2,13 @@
 
 A mobile roguelike cell-defense shooter, built with [Phaser 3](https://phaser.io) and Vite.
 
-You are a cell guarding the body. Slide your finger left and right, and you shoot automatically. Waves of viruses, germs and bacteria get stronger every wave.
-- **Level-ups:** kill enemies to level up, then pick 1 of 3 upgrades. These are stronger shots or new **attack stances**: Spread Shot, Enzyme Laser, Antibody Ring, Homing Phage and Immune Pulse. Each stance evolves at level 5.
+You are a cell guarding the body. Slide your finger to move: left and right, and up and down in the lower part of the screen to dodge the boss's attacks. You shoot automatically, and touching an enemy hurts. Waves of viruses, germs and bacteria get stronger every wave.
+- **Enemies:**
+  - viruses and slow tanks from level 1, and splitters from level 3;
+  - teal drifters from level 3: they sway slowly and always take 3 hits;
+  - fast yellow germs from level 4: they pop in one hit;
+  - shooters from level 4, plus elites and a boss in every level.
+- **Level-ups:** kill enemies to level up, then pick 1 of 3 upgrades. Each card shows exactly what changes, and maxed-out upgrades are never offered. These are stronger shots or new **attack stances**: Spread Shot, Enzyme Laser, Antibody Ring, Homing Phage and Immune Pulse. Each stance evolves at level 5.
 - **Bonus chests:** catch the ones that fall from elite enemies, or shoot them open, for extra upgrades.
 - **Rewarded ads:** watch one to revive, double your coins, or reroll the cards. Once per run, an ad can also **TAKE ALL** the cards on a bonus screen.
 - **Shop:** between runs, spend **coins** on permanent upgrades. **DNA**, from bosses, ads and the store, buys the strongest ones.
@@ -16,7 +21,7 @@ npm run dev        # http://localhost:5173 (also reachable from your phone on th
 npm run build      # production build in dist/
 ```
 
-Controls: drag anywhere on the screen to move. On desktop, the arrow keys or A/D also work.
+Controls: drag anywhere on the screen to move (left/right, and up/down in the lower part of the screen). On desktop, the arrow keys or WASD also work.
 
 Testing URL flags:
 | Flag | Effect |
