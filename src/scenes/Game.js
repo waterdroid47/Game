@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import { AUTOPLAY, DEBUG, H, MEMBRANE_Y, MOVE_TOP, PLAYER_Y, SPEED, SPRITE_SCALE, W } from '../config.js';
 import { ENEMIES } from '../data/enemies.js';
-import { LEVELS, xpFor } from '../data/levels.js';
-import { metaStats } from '../data/shop.js';
+import { LEVELS, LEVEL_UPS } from '../data/levels.js';
+import { enemyAdapt, metaStats } from '../data/shop.js';
 import { CARDS, STANCES, STANCE_MAX, STANCE_STATS, canTake, rollCards } from '../data/upgrades.js';
 import { Monetization } from '../services/monetization.js';
 import { sfx } from '../systems/Audio.js';
@@ -11,6 +11,12 @@ import { button, text } from '../ui/widgets.js';
 
 const BASE_FIRE_RATE = 2.6;
 const CHEST_RADIUS = 16;
+
+// XP an enemy is worth, including the enemies it splits into.
+const xpOf = (type) => {
+  const d = ENEMIES[type];
+  return d.xp + (d.split ? d.split.count * xpOf(d.split.into) : 0);
+};
 const ENEMY_COLORS = {
   virus: 0xe0335a, germ: 0xffd23f, tank: 0x7fae3a, splitter: 0x4aa8ff, mini: 0x4aa8ff,
   shooter: 0xff8a2a, elite: 0xc43cf0, boss: 0x56b53a, drifter: 0x3fd1a8,
@@ -30,12 +36,14 @@ export default class Game extends Phaser.Scene {
     this.tweens.timeScale = SPEED;
     this.physics.world.timeScale = 1 / SPEED;
 
-    this.bg = this.add.tileSprite(0, 0, W, H, 'bg').setOrigin(0).setTint(this.level.tint);
+    this.bg = this.add.tileSprite(0, 0, W, H, `bg_${this.level.n}`).setOrigin(0);
     this.add.tileSprite(0, MEMBRANE_Y, W, 18, 'membrane').setOrigin(0, 0).setTileScale(3, 3).setDepth(2);
     this.add.rectangle(0, MEMBRANE_Y + 18, W, H - MEMBRANE_Y - 18, 0x3a0d20).setOrigin(0).setDepth(2);
 
     // ----- run state -----
     const meta = (this.meta = metaStats());
+    // Enemies get partly tougher as the player buys shop upgrades (see data/shop.js).
+    this.adapt = enemyAdapt(meta);
     this.stats = {
       damage: 5 * meta.damageMult,
       fireRate: BASE_FIRE_RATE * meta.fireRateMult,
@@ -53,9 +61,10 @@ export default class Game extends Phaser.Scene {
     this.stances = { spread: 0, laser: 0, orbit: 0, missile: 0, pulse: 0 };
     this.cardLevels = {};
     this.hp = this.stats.maxHp;
-    this.xp = 0;
     this.runLevel = 1;
-    this.xpNext = xpFor(1);
+    this.waveXp = 0;
+    this.xpSteps = [];
+    this.xpStep = 0;
     this.levelUpQueue = [];
     this.kills = 0;
     this.coinsEarned = 0;
@@ -69,7 +78,7 @@ export default class Game extends Phaser.Scene {
     this.takeAllUsed = false;
     this.graveyard = [];
     this.floatCount = 0;
-    this.cd = { main: 0.5, spread: 1, laser: 2, missile: 1.5, pulse: 2, chest: Phaser.Math.Between(30, 45) };
+    this.cd = { main: 0.5, spread: 1, laser: 2, missile: 1.5, pulse: 2, chest: Phaser.Math.Between(45, 60) };
     this.laserTime = 0;
     this.laserTick = 0;
     this.orbitAngle = 0;
@@ -100,16 +109,22 @@ export default class Game extends Phaser.Scene {
 
     // ----- input: slide anywhere to move (left/right and up/down in the lower part) -----
     this.dragStart = null;
+    // Only the first finger steers; a second touch (e.g. on the pause button) is ignored.
     this.input.on('pointerdown', (p) => {
+      // Ignore a second finger, but not a stale drag whose release was missed.
+      if (this.dragStart && p.id !== this.dragId && this.input.manager.pointers[this.dragId]?.isDown) return;
+      this.dragId = p.id;
       this.dragStart = { x: p.x, y: p.y };
       this.dragFrom = { x: this.targetX, y: this.targetY };
     });
     this.input.on('pointermove', (p) => {
-      if (!p.isDown || !this.dragStart) return;
+      if (!p.isDown || !this.dragStart || p.id !== this.dragId) return;
       this.targetX = Phaser.Math.Clamp(this.dragFrom.x + (p.x - this.dragStart.x) * 1.4, 16, W - 16);
       this.targetY = Phaser.Math.Clamp(this.dragFrom.y + (p.y - this.dragStart.y) * 1.4, MOVE_TOP, PLAYER_Y);
     });
-    this.input.on('pointerup', () => { this.dragStart = null; });
+    const endDrag = (p) => { if (p.id === this.dragId) this.dragStart = null; };
+    this.input.on('pointerup', endDrag);
+    this.input.on('pointerupoutside', endDrag); // mouse released outside the game area
     this.keys = this.input.keyboard?.addKeys('LEFT,RIGHT,UP,DOWN,A,D,W,S');
 
     // ----- collisions -----
@@ -131,7 +146,7 @@ export default class Game extends Phaser.Scene {
     // Pause automatically when the app goes to the background.
     const onHidden = () => this.pauseGame();
     this.game.events.on('hidden', onHidden);
-    this.events.on('resume', () => { this.dragStart = null; });
+    this.events.on('resume', () => { this.dragStart = null; this.dragId = null; });
     this.events.once('shutdown', () => this.game.events.off('hidden', onHidden));
 
     this.spawner.start();
@@ -214,7 +229,7 @@ export default class Game extends Phaser.Scene {
     // Main blaster
     this.cd.main -= dt;
     if (this.cd.main <= 0 && hasTargets) {
-      this.cd.main = 1 / s.fireRate;
+      this.cd.main = Math.max(this.cd.main, -dt) + 1 / s.fireRate;
       const n = s.projectiles;
       for (let i = 0; i < n; i++) {
         const off = i - (n - 1) / 2;
@@ -228,7 +243,7 @@ export default class Game extends Phaser.Scene {
       this.cd.spread -= dt;
       if (this.cd.spread <= 0 && hasTargets) {
         const st = STANCE_STATS.spread(L.spread);
-        this.cd.spread = st.every / rateF;
+        this.cd.spread = Math.max(this.cd.spread, -dt) + st.every / rateF;
         for (let i = 0; i < st.shots; i++) {
           this.fireBullet(px, py, -90 - st.arc / 2 + (st.arc * i) / (st.shots - 1), s.damage * 0.7, {
             pierce: s.pierce + st.pierce, tint: 0xffd23f, scale: 0.85,
@@ -241,6 +256,7 @@ export default class Game extends Phaser.Scene {
     this.laserGfx.clear();
     if (L.laser) {
       const st = STANCE_STATS.laser(L.laser);
+      this.cd.laser -= dt;
       if (this.laserTime > 0) {
         this.laserTime -= dt;
         this.laserTick -= dt;
@@ -259,13 +275,10 @@ export default class Game extends Phaser.Scene {
             if (Math.abs(c.x - px) < w / 2 + CHEST_RADIUS && c.y < py) this.damageChest(c, dmg);
           }
         }
-      } else {
-        this.cd.laser -= dt;
-        if (this.cd.laser <= 0 && hasTargets) {
-          this.cd.laser = st.every;
-          this.laserTime = st.duration;
-          sfx.laser();
-        }
+      } else if (this.cd.laser <= 0 && hasTargets) {
+        this.cd.laser = st.every; // time from one beam start to the next
+        this.laserTime = st.duration;
+        sfx.laser();
       }
     }
 
@@ -375,10 +388,10 @@ export default class Game extends Phaser.Scene {
   // ======================================================================
   updateProjectiles(dt) {
     for (const b of this.bullets.getChildren()) {
-      if (b.active && (b.y < -20 || b.x < -20 || b.x > W + 20)) b.disableBody(true, true);
+      if (b.active && (b.y < -20 || b.y > H + 20 || b.x < -20 || b.x > W + 20)) b.disableBody(true, true);
     }
     for (const b of this.enemyBullets.getChildren()) {
-      if (b.active && b.y > H + 10) b.disableBody(true, true);
+      if (b.active && (b.y > H + 10 || b.y < -20 || b.x < -20 || b.x > W + 20)) b.disableBody(true, true);
     }
     for (const m of this.missiles.getChildren()) {
       if (!m.active) continue;
@@ -414,7 +427,7 @@ export default class Game extends Phaser.Scene {
     if (!this.spawner.isBoss) {
       this.cd.chest -= dt;
       if (this.cd.chest <= 0) {
-        this.cd.chest = Phaser.Math.Between(50, 80);
+        this.cd.chest = Phaser.Math.Between(90, 120);
         this.dropChest(Phaser.Math.Between(40, W - 40), -10, Math.random() < 0.15);
       }
     }
@@ -497,14 +510,18 @@ export default class Game extends Phaser.Scene {
     const def = ENEMIES[type];
     const e = this.physics.add.sprite(x, y, def.tex).setScale(def.scale ?? SPRITE_SCALE).setDepth(5);
     this.enemies.add(e);
-    const r = Math.min(e.width, e.height) * 0.45;
-    e.body.setCircle(r, e.width / 2 - r, e.height / 2 - r);
+    if (def.wideBody) {
+      e.body.setSize(e.width * 0.9, e.height * 0.8);
+    } else {
+      const r = Math.min(e.width, e.height) * 0.45;
+      e.body.setCircle(r, e.width / 2 - r, e.height / 2 - r);
+    }
     e.def = def;
     e.type = type;
     // def.hits: dies after that many hits, whatever the damage.
-    e.maxHp = e.hp = def.hits ? def.hits : def.boss ? def.hp * this.level.hpMult : def.hp * hpMult;
+    e.maxHp = e.hp = def.hits ? def.hits : (def.boss ? def.hp * this.level.hpMult : def.hp * hpMult) * this.adapt.hp;
     e.speed = def.speed * this.level.speedMult * Phaser.Math.FloatBetween(0.9, 1.1);
-    e.baseX = def.boss ? W / 2 : x;
+    e.baseX = def.boss ? W / 2 : def.wobble ? Phaser.Math.Clamp(x, 24 + def.wobble, W - 24 - def.wobble) : x;
     e.t = Math.random() * 10;
     e.shootT = def.shoot ? def.shoot.every * Phaser.Math.FloatBetween(0.5, 1) : 0;
     e.holdY = def.hold ? Phaser.Math.Between(def.hold[0], def.hold[1]) : null;
@@ -520,6 +537,17 @@ export default class Game extends Phaser.Scene {
       this.cameras.main.shake(500, 0.008);
     }
     return e;
+  }
+
+  // Damage an enemy deals: base x level x adapt-to-upgrades.
+  enemyDamage(base) {
+    return base * this.level.dmgMult * this.adapt.dmg;
+  }
+
+  // Aimed shots grow more slowly (+5% per level, half the adaptation): several shooters
+  // fire at once, so full scaling made later levels a wall.
+  enemyShotDamage(base) {
+    return base * (1 + 0.05 * (this.level.n - 1)) * (1 + 0.5 * (this.adapt.dmg - 1));
   }
 
   liveEnemies() {
@@ -580,7 +608,7 @@ export default class Game extends Phaser.Scene {
         }
       }
       if (e.y >= MEMBRANE_Y - 6) {
-        this.hurtPlayer(def.dmg * this.level.dmgMult);
+        this.hurtPlayer(this.enemyDamage(def.dmg));
         this.burst(e.x, MEMBRANE_Y, 0xff7aa8, 12);
         this.removeEnemy(e);
       }
@@ -600,7 +628,7 @@ export default class Game extends Phaser.Scene {
       b.setScale(2.4).setDepth(6);
       b.body.setCircle(2, 0.5, 0.5);
       this.physics.velocityFromRotation(a, sh.speed, b.body.velocity);
-      b.damage = sh.dmg * this.level.dmgMult;
+      b.damage = this.enemyShotDamage(sh.dmg);
     }
   }
 
@@ -689,7 +717,7 @@ export default class Game extends Phaser.Scene {
   // Touching an enemy hurts: it bursts on the membrane of the cell (the boss just hurts).
   onPlayerTouchEnemy(_p, e) {
     if (!e.active || e.dying || this.invuln > 0 || this.dead || this.finished) return;
-    const dmg = e.def.dmg * this.level.dmgMult;
+    const dmg = this.enemyDamage(e.def.dmg);
     if (e.def.boss) {
       this.hurtPlayer(dmg * 0.5);
       this.invuln = Math.max(this.invuln, 1);
@@ -725,14 +753,30 @@ export default class Game extends Phaser.Scene {
     this.hp = Math.min(this.stats.maxHp, this.hp + n);
   }
 
+  // Called by the spawner when a wave starts, with the enemy types it will spawn.
+  // Level-ups happen at fixed shares of the wave's total XP: two in wave 1, then one per wave.
+  startWaveXp(wave, types) {
+    const total = types.reduce((a, t) => a + xpOf(t), 0);
+    const shares = wave === 1 ? LEVEL_UPS.first : LEVEL_UPS.other;
+    this.xpSteps = shares.map((f) => Math.max(1, Math.round(total * f)));
+    this.xpStep = 0;
+    this.waveXp = 0;
+  }
+
   gainXp(n) {
-    this.xp += n * this.stats.xpMult;
-    while (this.xp >= this.xpNext) {
-      this.xp -= this.xpNext;
+    this.waveXp += n * this.stats.xpMult;
+    while (this.xpStep < this.xpSteps.length && this.waveXp >= this.xpSteps[this.xpStep]) {
+      this.xpStep += 1;
       this.runLevel += 1;
-      this.xpNext = xpFor(this.runLevel);
       this.levelUpQueue.push('xp');
     }
+  }
+
+  // 0..1 progress towards this wave's next level-up (1 = all done for this wave).
+  xpProgress() {
+    if (this.xpStep >= this.xpSteps.length) return 1;
+    const from = this.xpStep ? this.xpSteps[this.xpStep - 1] : 0;
+    return Phaser.Math.Clamp((this.waveXp - from) / (this.xpSteps[this.xpStep] - from), 0, 1);
   }
 
   openLevelUp(source) {
@@ -793,9 +837,9 @@ export default class Game extends Phaser.Scene {
           c.destroy();
           this.revive();
         }
-      }, { color: 0x8a6d00, size: 17 }));
+      }, { color: 0x8a6d00, size: 17, armAfter: 600 }));
     }
-    c.add(button(this, W / 2, 430, 200, 44, 'GIVE UP', () => { c.destroy(); this.finish(false); }, { color: 0x663333 }));
+    c.add(button(this, W / 2, 430, 200, 44, 'GIVE UP', () => { c.destroy(); this.finish(false); }, { color: 0x663333, armAfter: 600 }));
   }
 
   revive() {
@@ -804,6 +848,7 @@ export default class Game extends Phaser.Scene {
     for (const e of this.liveEnemies()) {
       if (!e.def.boss && e.y > this.player.y - 260) {
         this.burst(e.x, e.y, 0x7dff7a, 6);
+        this.gainXp(xpOf(e.type)); // still counts towards this wave's level-up (no coins)
         this.removeEnemy(e);
       }
     }
@@ -875,7 +920,8 @@ export default class Game extends Phaser.Scene {
     g.fillStyle(0xff3b5c, 1).fillRect(6, 6, (118 * this.hp) / this.stats.maxHp, 18);
     g.fillStyle(0xffffff, 0.25).fillRect(6, 6, (118 * this.hp) / this.stats.maxHp, 4);
     g.fillStyle(0x000000, 1).fillRect(0, 30, W, 9);
-    g.fillStyle(0x9d74ff, 1).fillRect(1, 31, ((W - 2) * this.xp) / this.xpNext, 7);
+    const waveDone = this.xpStep >= this.xpSteps.length;
+    g.fillStyle(waveDone ? 0x5a4a80 : 0x9d74ff, 1).fillRect(1, 31, (W - 2) * this.xpProgress(), 7);
     this.hpText.setText(`${Math.ceil(this.hp)}/${Math.round(this.stats.maxHp)}`);
     this.waveText.setText(`WAVE ${this.spawner.wave}/${this.level.waves}`);
     this.coinText.setText(String(Math.round(this.coinsEarned * this.stats.coinMult)));

@@ -56,14 +56,14 @@ export default class Result extends Phaser.Scene {
         dbl.setEnabled(false).setLabel('DOUBLED!');
         sfx.coin();
         refresh();
-      }, { color: 0x8a6d00, size: 16 });
+      }, { color: 0x8a6d00, size: 16, armAfter: 600 });
     }
 
     const hasNext = r.victory && r.level < LEVELS.length;
     button(this, W / 2, 480, 220, 50, hasNext ? 'NEXT LEVEL' : 'RETRY', () => {
       this.scene.start('Game', { level: hasNext ? r.level + 1 : r.level });
-    }, { size: 20 });
-    button(this, W / 2 - 60, 548, 110, 40, 'UPGRADES', () => this.scene.start('Shop'), { color: 0x2b6cb0, size: 13 });
-    button(this, W / 2 + 60, 548, 110, 40, 'MENU', () => this.scene.start('Menu'), { color: 0x6b2b4a, size: 13 });
+    }, { size: 20, armAfter: 600 });
+    button(this, W / 2 - 60, 548, 110, 40, 'UPGRADES', () => this.scene.start('Shop'), { color: 0x2b6cb0, size: 13, armAfter: 600 });
+    button(this, W / 2 + 60, 548, 110, 40, 'MENU', () => this.scene.start('Menu'), { color: 0x6b2b4a, size: 13, armAfter: 600 });
   }
 }

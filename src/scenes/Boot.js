@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { createTextures } from '../art/pixelSprites.js';
 import { DEBUG, START_LEVEL } from '../config.js';
+import { LEVELS } from '../data/levels.js';
 import { Save } from '../systems/SaveSystem.js';
 
 export default class Boot extends Phaser.Scene {
@@ -9,7 +10,7 @@ export default class Boot extends Phaser.Scene {
   }
 
   create() {
-    createTextures(this);
+    createTextures(this, LEVELS);
     if (DEBUG) {
       Save.data.unlocked = 10;
       Save.data.coins = Math.max(Save.data.coins, 50000);

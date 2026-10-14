@@ -6,13 +6,26 @@ export const SHOP = [
   { id: 'damage', name: 'Enzyme Power', desc: '+10% damage', icon: 'ic_dmg', color: 0xff5a5a, currency: 'coins', max: 10, cost: (l) => Math.round(60 * 1.55 ** l) },
   { id: 'hp', name: 'Thick Membrane', desc: '+15 max HP', icon: 'ic_hp', color: 0xff3b5c, currency: 'coins', max: 10, cost: (l) => Math.round(50 * 1.5 ** l) },
   { id: 'fireRate', name: 'Fast Ribosomes', desc: '+6% fire rate', icon: 'ic_rate', color: 0x7ff9ff, currency: 'coins', max: 10, cost: (l) => Math.round(70 * 1.55 ** l) },
-  { id: 'xp', name: 'Quick Learner', desc: '+8% XP', icon: 'ic_xp', color: 0x9d74ff, currency: 'coins', max: 5, cost: (l) => Math.round(120 * 1.7 ** l) },
+  { id: 'xp', name: 'Quick Learner', desc: 'Level up sooner in each wave', icon: 'ic_xp', color: 0x9d74ff, currency: 'coins', max: 5, cost: (l) => Math.round(120 * 1.7 ** l) },
   { id: 'coins', name: 'Greedy Cell', desc: '+10% coins', icon: 'ic_coins', color: 0xffd23f, currency: 'coins', max: 5, cost: (l) => Math.round(150 * 1.7 ** l) },
   { id: 'crit', name: 'Killer Instinct', desc: '+5% crit chance', icon: 'ic_crit', color: 0xffd23f, currency: 'dna', max: 3, cost: (l) => 40 * (l + 1) },
   { id: 'startStance', name: 'Head Start', desc: 'Start each run with a stance', icon: 'ic_spread', color: 0xffd23f, currency: 'dna', max: 1, cost: () => 80 },
   { id: 'extraCard', name: 'Mutation Insight', desc: 'Level-ups show 4 cards', icon: 'ic_multi', color: 0xb04cff, currency: 'dna', max: 1, cost: () => 150 },
   { id: 'revive', name: 'Second Life', desc: '1 free revive per run', icon: 'ic_hp', color: 0x7dff7a, currency: 'dna', max: 1, cost: () => 120 },
 ];
+
+// Enemies adapt to shop upgrades, but only partly: they gain ADAPT (45%) of the power the
+// player bought, so every upgrade still makes the player clearly stronger.
+export const ADAPT = 0.45;
+
+// How much tougher enemies are because of the upgrades bought so far.
+//   hp:  from attack upgrades (damage x fire rate x crit)
+//   dmg: from max-HP upgrades
+export function enemyAdapt(meta = metaStats()) {
+  const attack = meta.damageMult * meta.fireRateMult * (1 + meta.crit);
+  const defense = 1 + meta.hp / 100;
+  return { hp: 1 + ADAPT * (attack - 1), dmg: 1 + ADAPT * (defense - 1) };
+}
 
 // Combined effect of everything bought in the shop.
 export function metaStats() {
