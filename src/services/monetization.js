@@ -17,6 +17,11 @@ function overlay(html) {
   const el = document.createElement('div');
   el.style.cssText = 'position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.85);font-family:"Courier New",monospace;color:#fff;';
   el.innerHTML = `<div style="width:min(86vw,340px);background:#24101b;border:4px solid #000;box-shadow:0 0 0 4px #ff7aa8;padding:20px;text-align:center">${html}</div>`;
+  // Phaser listens for taps on the whole window, so stop taps on this overlay from
+  // reaching the game objects underneath (e.g. a card hidden behind the ad).
+  for (const type of ['mousedown', 'mouseup', 'touchstart', 'touchend', 'pointerdown', 'pointerup']) {
+    el.addEventListener(type, (e) => e.stopPropagation());
+  }
   document.body.appendChild(el);
   return el;
 }
