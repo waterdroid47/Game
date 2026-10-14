@@ -62,12 +62,12 @@ export function button(scene, x, y, w, h, label, onClick, opts = {}) {
   });
   let last = 0;
   c.on('pointerup', (p) => {
-    face.setScale(1);
-    const wasPressed = pressedBy !== null && p.id === pressedBy;
+    if (pressedBy === null || p.id !== pressedBy) return; // another finger lifting doesn't count
     pressedBy = null;
+    face.setScale(1);
     // Ignore duplicate events (touch + emulated mouse) and double taps.
     const now = performance.now();
-    if (!enabled || !wasPressed || now - last < 300) return;
+    if (!enabled || now - last < 300) return;
     last = now;
     sfx.click();
     onClick();

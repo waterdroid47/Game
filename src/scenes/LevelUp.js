@@ -97,10 +97,10 @@ export default class LevelUp extends Phaser.Scene {
         face.setScale(1);
       });
       c.on('pointerup', (ptr) => {
-        const wasPressed = c.pressedBy != null && ptr.id === c.pressedBy;
+        if (c.pressedBy == null || ptr.id !== c.pressedBy) return; // another finger lifting doesn't count
         c.pressedBy = null;
         face.setScale(1);
-        if (wasPressed) this.choose(p);
+        this.choose(p);
       });
       c.setAlpha(0).setScale(0.85);
       this.tweens.add({ targets: c, alpha: 1, scale: 1, delay: i * 70, duration: 200, ease: 'Back.out' });
