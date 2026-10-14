@@ -18,6 +18,9 @@ export function text(scene, x, y, str, size = 16, color = '#ffffff', originX = 0
 // A chunky pixel-style button. Returns a container with .setLabel() and .setEnabled().
 export function button(scene, x, y, w, h, label, onClick, opts = {}) {
   const c = scene.add.container(x, y);
+  // The visuals live in an inner container: only it shrinks when pressed, so the tap
+  // area stays the full size (a press near the edge still counts).
+  const face = scene.add.container(0, 0);
   const g = scene.add.graphics();
   let enabled = !opts.disabled;
   const color = opts.color ?? 0x2e9e5b;
@@ -31,12 +34,14 @@ export function button(scene, x, y, w, h, label, onClick, opts = {}) {
   };
   draw();
   const t = text(scene, 0, -1, label, opts.size ?? 16, enabled ? '#ffffff' : '#9a9a9a');
-  c.add([g, t]);
+  face.add([g, t]);
   if (opts.icon) {
     const ic = scene.add.image(-w / 2 + 18, 0, opts.icon).setScale(opts.iconScale ?? 2);
-    c.add(ic);
+    face.add(ic);
     t.x += 10;
   }
+  c.add(face);
+  c.add = (child) => { face.add(child); return c; }; // extra content (e.g. stars) goes on the face
   c.setSize(w, h);
   c.setInteractive({ useHandCursor: true });
   // Only a tap that starts on the button counts: lifting a finger that was dragging
@@ -44,18 +49,22 @@ export function button(scene, x, y, w, h, label, onClick, opts = {}) {
   // opts.armAfter (ms): ignore touches for a moment after the button appears, so a finger
   // that is still on the screen from gameplay can't press it by accident.
   const armedAt = performance.now() + (opts.armAfter || 0);
-  let pressed = false;
-  c.on('pointerdown', () => {
+  let pressedBy = null; // id of the finger/mouse that pressed this button
+  c.on('pointerdown', (p) => {
     if (performance.now() < armedAt) return;
-    pressed = true;
-    if (enabled) c.setScale(0.95);
+    pressedBy = p.id;
+    if (enabled) face.setScale(0.95);
   });
-  c.on('pointerout', () => { pressed = false; c.setScale(1); });
+  c.on('pointerout', (p) => {
+    if (p.id !== pressedBy) return;
+    pressedBy = null;
+    face.setScale(1);
+  });
   let last = 0;
-  c.on('pointerup', () => {
-    c.setScale(1);
-    const wasPressed = pressed;
-    pressed = false;
+  c.on('pointerup', (p) => {
+    face.setScale(1);
+    const wasPressed = pressedBy !== null && p.id === pressedBy;
+    pressedBy = null;
     // Ignore duplicate events (touch + emulated mouse) and double taps.
     const now = performance.now();
     if (!enabled || !wasPressed || now - last < 300) return;

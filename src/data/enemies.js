@@ -10,7 +10,7 @@ export const ENEMIES = {
   mini: { tex: 'mini', hp: 5, speed: 54, dmg: 4, xp: 1, coins: 0, radius: 9, wobble: 25 },
   shooter: {
     tex: 'shooter', hp: 18, speed: 26, dmg: 10, xp: 2, coins: 2, radius: 14,
-    hold: [110, 260], shoot: { every: 2.4, speed: 150, dmg: 7, count: 1 },
+    hold: [110, 260], shoot: { every: 2.8, speed: 150, dmg: 7, count: 1 },
   },
   elite: { tex: 'elite', hp: 150, speed: 15, dmg: 25, xp: 8, coins: 10, radius: 20, chest: true, scale: 3 },
   boss: {

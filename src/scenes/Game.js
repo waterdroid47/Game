@@ -11,6 +11,12 @@ import { button, text } from '../ui/widgets.js';
 
 const BASE_FIRE_RATE = 2.6;
 const CHEST_RADIUS = 16;
+
+// XP an enemy is worth, including the enemies it splits into.
+const xpOf = (type) => {
+  const d = ENEMIES[type];
+  return d.xp + (d.split ? d.split.count * xpOf(d.split.into) : 0);
+};
 const ENEMY_COLORS = {
   virus: 0xe0335a, germ: 0xffd23f, tank: 0x7fae3a, splitter: 0x4aa8ff, mini: 0x4aa8ff,
   shooter: 0xff8a2a, elite: 0xc43cf0, boss: 0x56b53a, drifter: 0x3fd1a8,
@@ -105,7 +111,8 @@ export default class Game extends Phaser.Scene {
     this.dragStart = null;
     // Only the first finger steers; a second touch (e.g. on the pause button) is ignored.
     this.input.on('pointerdown', (p) => {
-      if (this.dragStart) return;
+      // Ignore a second finger, but not a stale drag whose release was missed.
+      if (this.dragStart && p.id !== this.dragId && this.input.manager.pointers[this.dragId]?.isDown) return;
       this.dragId = p.id;
       this.dragStart = { x: p.x, y: p.y };
       this.dragFrom = { x: this.targetX, y: this.targetY };
@@ -115,7 +122,9 @@ export default class Game extends Phaser.Scene {
       this.targetX = Phaser.Math.Clamp(this.dragFrom.x + (p.x - this.dragStart.x) * 1.4, 16, W - 16);
       this.targetY = Phaser.Math.Clamp(this.dragFrom.y + (p.y - this.dragStart.y) * 1.4, MOVE_TOP, PLAYER_Y);
     });
-    this.input.on('pointerup', (p) => { if (p.id === this.dragId) this.dragStart = null; });
+    const endDrag = (p) => { if (p.id === this.dragId) this.dragStart = null; };
+    this.input.on('pointerup', endDrag);
+    this.input.on('pointerupoutside', endDrag); // mouse released outside the game area
     this.keys = this.input.keyboard?.addKeys('LEFT,RIGHT,UP,DOWN,A,D,W,S');
 
     // ----- collisions -----
@@ -379,7 +388,7 @@ export default class Game extends Phaser.Scene {
   // ======================================================================
   updateProjectiles(dt) {
     for (const b of this.bullets.getChildren()) {
-      if (b.active && (b.y < -20 || b.x < -20 || b.x > W + 20)) b.disableBody(true, true);
+      if (b.active && (b.y < -20 || b.y > H + 20 || b.x < -20 || b.x > W + 20)) b.disableBody(true, true);
     }
     for (const b of this.enemyBullets.getChildren()) {
       if (b.active && (b.y > H + 10 || b.y < -20 || b.x < -20 || b.x > W + 20)) b.disableBody(true, true);
@@ -535,6 +544,12 @@ export default class Game extends Phaser.Scene {
     return base * this.level.dmgMult * this.adapt.dmg;
   }
 
+  // Aimed shots grow more slowly (+5% per level, half the adaptation): several shooters
+  // fire at once, so full scaling made later levels a wall.
+  enemyShotDamage(base) {
+    return base * (1 + 0.05 * (this.level.n - 1)) * (1 + 0.5 * (this.adapt.dmg - 1));
+  }
+
   liveEnemies() {
     return this.enemies.getChildren().filter((e) => e.active && !e.dying);
   }
@@ -613,7 +628,7 @@ export default class Game extends Phaser.Scene {
       b.setScale(2.4).setDepth(6);
       b.body.setCircle(2, 0.5, 0.5);
       this.physics.velocityFromRotation(a, sh.speed, b.body.velocity);
-      b.damage = this.enemyDamage(sh.dmg);
+      b.damage = this.enemyShotDamage(sh.dmg);
     }
   }
 
@@ -741,10 +756,6 @@ export default class Game extends Phaser.Scene {
   // Called by the spawner when a wave starts, with the enemy types it will spawn.
   // Level-ups happen at fixed shares of the wave's total XP: two in wave 1, then one per wave.
   startWaveXp(wave, types) {
-    const xpOf = (t) => {
-      const d = ENEMIES[t];
-      return d.xp + (d.split ? d.split.count * xpOf(d.split.into) : 0);
-    };
     const total = types.reduce((a, t) => a + xpOf(t), 0);
     const shares = wave === 1 ? LEVEL_UPS.first : LEVEL_UPS.other;
     this.xpSteps = shares.map((f) => Math.max(1, Math.round(total * f)));
@@ -837,6 +848,7 @@ export default class Game extends Phaser.Scene {
     for (const e of this.liveEnemies()) {
       if (!e.def.boss && e.y > this.player.y - 260) {
         this.burst(e.x, e.y, 0x7dff7a, 6);
+        this.gainXp(xpOf(e.type)); // still counts towards this wave's level-up (no coins)
         this.removeEnemy(e);
       }
     }

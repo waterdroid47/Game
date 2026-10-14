@@ -69,31 +69,37 @@ export default class LevelUp extends Phaser.Scene {
     picks.forEach((p, i) => {
       const y = top + i * (ch + gap) + ch / 2;
       const c = this.add.container(W / 2, y);
+      const face = this.add.container(0, 0); // shrinks on press; the tap area stays full size
       const g = this.add.graphics();
       g.fillStyle(0x000000, 1).fillRect(-164, -ch / 2 - 4, 328, ch + 8);
       g.fillStyle(p.color, 1).fillRect(-162, -ch / 2 - 2, 324, ch + 4);
       g.fillStyle(0x2a1220, 1).fillRect(-156, -ch / 2 + 2, 316, ch - 4);
       g.fillStyle(0x000000, 0.35).fillRect(-156, -ch / 2 + 2, 62, ch - 4);
-      c.add(g);
-      c.add(this.add.image(-125, 0, p.icon).setScale(4).setTint(p.color));
-      c.add(text(this, -84, -ch / 2 + 22, p.name, 16, '#ffffff', 0, 0.5));
-      if (p.tag) c.add(text(this, 150, -ch / 2 + 18, p.tag, 11, p.tag === 'NEW!' || p.tag === 'EVOLVE' ? '#ffd23f' : '#b0a0c0', 1, 0.5));
+      face.add(g);
+      face.add(this.add.image(-125, 0, p.icon).setScale(4).setTint(p.color));
+      face.add(text(this, -84, -ch / 2 + 22, p.name, 16, '#ffffff', 0, 0.5));
+      if (p.tag) face.add(text(this, 150, -ch / 2 + 18, p.tag, 11, p.tag === 'NEW!' || p.tag === 'EVOLVE' ? '#ffd23f' : '#b0a0c0', 1, 0.5));
       const d = text(this, -84, 10, p.desc, 12, '#e0c8d4', 0, 0.5).setAlign('left');
       d.setWordWrapWidth(228);
-      c.add(d);
+      face.add(d);
+      c.add(face);
       c.setSize(328, ch).setInteractive({ useHandCursor: true });
       // A card is chosen only by a tap that starts on it, so lifting the finger that was
       // moving the cell when this screen opened doesn't pick a card blindly.
-      c.on('pointerdown', () => {
+      c.on('pointerdown', (ptr) => {
         if (performance.now() < this.readyAt) return;
-        c.pressed = true;
-        c.setScale(0.97);
+        c.pressedBy = ptr.id;
+        face.setScale(0.97);
       });
-      c.on('pointerout', () => { c.pressed = false; c.setScale(1); });
-      c.on('pointerup', () => {
-        const wasPressed = c.pressed;
-        c.pressed = false;
-        c.setScale(1);
+      c.on('pointerout', (ptr) => {
+        if (ptr.id !== c.pressedBy) return;
+        c.pressedBy = null;
+        face.setScale(1);
+      });
+      c.on('pointerup', (ptr) => {
+        const wasPressed = c.pressedBy != null && ptr.id === c.pressedBy;
+        c.pressedBy = null;
+        face.setScale(1);
         if (wasPressed) this.choose(p);
       });
       c.setAlpha(0).setScale(0.85);
