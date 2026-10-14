@@ -1,0 +1,19 @@
+{
+  "name": "cell-defender",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cell Defender - a mobile roguelike cell-defense shooter",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "icons": "node scripts/make-icons.mjs"
+  },
+  "dependencies": {
+    "phaser": "3.90.0"
+  },
+  "devDependencies": {
+    "vite": "^6.4.4"
+  }
+}
