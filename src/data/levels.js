@@ -17,9 +17,11 @@ const BACKGROUNDS = [
   ['#30112a', '#461a3d', '#56214b'], // brain: pink
 ];
 
-// How much tougher each level's enemies are (health). Each step is about +15-20%,
-// roughly matching what the shop upgrades bought with the previous level's coins add.
-const HP_MULT = [1, 1.25, 1.55, 1.85, 2.2, 2.55, 2.95, 3.35, 3.8, 4.3];
+// How much tougher each level's enemies are (health): +12% per level. Shop upgrades only
+// add ~6-8% net power per level (they get pricier, and enemies adapt to them), so bigger
+// steps make the first wave of a new level a wall. Later levels also get harder through
+// more waves, faster spawns, more enemy types and more damage.
+const HP_MULT = [1, 1.12, 1.24, 1.36, 1.48, 1.6, 1.72, 1.84, 1.96, 2.1];
 
 // Early levels: mostly basic viruses and slow tanks. Drifters (3 hits) from level 3,
 // fast germs (1 hit) from level 4.
@@ -52,7 +54,7 @@ export const LEVELS = NAMES.map((name, i) => {
 export function waveSpec(level, wave) {
   return {
     count: 8 + wave * 4 + level.n,
-    interval: Math.max(0.28, 1.05 - wave * 0.06 - level.n * 0.04),
+    interval: Math.max(0.28, 1.05 - wave * 0.06 - level.n * 0.02),
     hpMult: level.hpMult * (1 + 0.16 * (wave - 1)),
     elites: wave >= 4 && wave % 3 === 1 ? 1 + Math.floor(level.n / 4) : 0,
   };
