@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { AUTOPLAY, DEBUG, H, MEMBRANE_Y, MOVE_TOP, PLAYER_Y, SPEED, SPRITE_SCALE, W } from '../config.js';
 import { ENEMIES } from '../data/enemies.js';
 import { LEVELS, LEVEL_UPS } from '../data/levels.js';
-import { metaStats } from '../data/shop.js';
+import { enemyAdapt, metaStats } from '../data/shop.js';
 import { CARDS, STANCES, STANCE_MAX, STANCE_STATS, canTake, rollCards } from '../data/upgrades.js';
 import { Monetization } from '../services/monetization.js';
 import { sfx } from '../systems/Audio.js';
@@ -36,6 +36,8 @@ export default class Game extends Phaser.Scene {
 
     // ----- run state -----
     const meta = (this.meta = metaStats());
+    // Enemies get partly tougher as the player buys shop upgrades (see data/shop.js).
+    this.adapt = enemyAdapt(meta);
     this.stats = {
       damage: 5 * meta.damageMult,
       fireRate: BASE_FIRE_RATE * meta.fireRateMult,
@@ -508,7 +510,7 @@ export default class Game extends Phaser.Scene {
     e.def = def;
     e.type = type;
     // def.hits: dies after that many hits, whatever the damage.
-    e.maxHp = e.hp = def.hits ? def.hits : def.boss ? def.hp * this.level.hpMult : def.hp * hpMult;
+    e.maxHp = e.hp = def.hits ? def.hits : (def.boss ? def.hp * this.level.hpMult : def.hp * hpMult) * this.adapt.hp;
     e.speed = def.speed * this.level.speedMult * Phaser.Math.FloatBetween(0.9, 1.1);
     e.baseX = def.boss ? W / 2 : def.wobble ? Phaser.Math.Clamp(x, 24 + def.wobble, W - 24 - def.wobble) : x;
     e.t = Math.random() * 10;
@@ -526,6 +528,11 @@ export default class Game extends Phaser.Scene {
       this.cameras.main.shake(500, 0.008);
     }
     return e;
+  }
+
+  // Damage an enemy deals: base x level x adapt-to-upgrades.
+  enemyDamage(base) {
+    return base * this.level.dmgMult * this.adapt.dmg;
   }
 
   liveEnemies() {
@@ -586,7 +593,7 @@ export default class Game extends Phaser.Scene {
         }
       }
       if (e.y >= MEMBRANE_Y - 6) {
-        this.hurtPlayer(def.dmg * this.level.dmgMult);
+        this.hurtPlayer(this.enemyDamage(def.dmg));
         this.burst(e.x, MEMBRANE_Y, 0xff7aa8, 12);
         this.removeEnemy(e);
       }
@@ -606,7 +613,7 @@ export default class Game extends Phaser.Scene {
       b.setScale(2.4).setDepth(6);
       b.body.setCircle(2, 0.5, 0.5);
       this.physics.velocityFromRotation(a, sh.speed, b.body.velocity);
-      b.damage = sh.dmg * this.level.dmgMult;
+      b.damage = this.enemyDamage(sh.dmg);
     }
   }
 
@@ -695,7 +702,7 @@ export default class Game extends Phaser.Scene {
   // Touching an enemy hurts: it bursts on the membrane of the cell (the boss just hurts).
   onPlayerTouchEnemy(_p, e) {
     if (!e.active || e.dying || this.invuln > 0 || this.dead || this.finished) return;
-    const dmg = e.def.dmg * this.level.dmgMult;
+    const dmg = this.enemyDamage(e.def.dmg);
     if (e.def.boss) {
       this.hurtPlayer(dmg * 0.5);
       this.invuln = Math.max(this.invuln, 1);

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { W, H } from '../config.js';
-import { SHOP } from '../data/shop.js';
+import { SHOP, enemyAdapt } from '../data/shop.js';
 import { Save } from '../systems/SaveSystem.js';
 import { sfx } from '../systems/Audio.js';
 import { backButton, button, currencyBar, panel, text } from '../ui/widgets.js';
@@ -15,7 +15,7 @@ export default class Shop extends Phaser.Scene {
     const refresh = currencyBar(this, Save);
     backButton(this);
     text(this, W / 2, 62, 'UPGRADES', 24, '#7dff7a');
-    text(this, W / 2, 84, 'permanent – kept between runs', 10, '#c090a8');
+    const adaptText = text(this, W / 2, 84, '', 10, '#c090a8');
 
     const rows = [];
     SHOP.forEach((item, i) => {
@@ -39,6 +39,11 @@ export default class Shop extends Phaser.Scene {
 
     const update = () => {
       refresh();
+      const a = enemyAdapt();
+      const pct = (x) => Math.round((x - 1) * 100);
+      adaptText.setText(pct(a.hp) || pct(a.dmg)
+        ? `Enemies adapt: +${pct(a.hp)}% health, +${pct(a.dmg)}% damage`
+        : 'Permanent. Enemies adapt a little as you upgrade.');
       for (const { item, b, pips, y } of rows) {
         const lvl = Save.level(item.id);
         pips.clear();

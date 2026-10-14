@@ -14,6 +14,19 @@ export const SHOP = [
   { id: 'revive', name: 'Second Life', desc: '1 free revive per run', icon: 'ic_hp', color: 0x7dff7a, currency: 'dna', max: 1, cost: () => 120 },
 ];
 
+// Enemies adapt to shop upgrades, but only partly: they gain ADAPT (45%) of the power the
+// player bought, so every upgrade still makes the player clearly stronger.
+export const ADAPT = 0.45;
+
+// How much tougher enemies are because of the upgrades bought so far.
+//   hp:  from attack upgrades (damage x fire rate x crit)
+//   dmg: from max-HP upgrades
+export function enemyAdapt(meta = metaStats()) {
+  const attack = meta.damageMult * meta.fireRateMult * (1 + meta.crit);
+  const defense = 1 + meta.hp / 100;
+  return { hp: 1 + ADAPT * (attack - 1), dmg: 1 + ADAPT * (defense - 1) };
+}
+
 // Combined effect of everything bought in the shop.
 export function metaStats() {
   const u = (id) => Save.data.upgrades[id] || 0;
