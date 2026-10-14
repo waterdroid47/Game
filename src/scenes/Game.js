@@ -100,16 +100,19 @@ export default class Game extends Phaser.Scene {
 
     // ----- input: slide anywhere to move (left/right and up/down in the lower part) -----
     this.dragStart = null;
+    // Only the first finger steers; a second touch (e.g. on the pause button) is ignored.
     this.input.on('pointerdown', (p) => {
+      if (this.dragStart) return;
+      this.dragId = p.id;
       this.dragStart = { x: p.x, y: p.y };
       this.dragFrom = { x: this.targetX, y: this.targetY };
     });
     this.input.on('pointermove', (p) => {
-      if (!p.isDown || !this.dragStart) return;
+      if (!p.isDown || !this.dragStart || p.id !== this.dragId) return;
       this.targetX = Phaser.Math.Clamp(this.dragFrom.x + (p.x - this.dragStart.x) * 1.4, 16, W - 16);
       this.targetY = Phaser.Math.Clamp(this.dragFrom.y + (p.y - this.dragStart.y) * 1.4, MOVE_TOP, PLAYER_Y);
     });
-    this.input.on('pointerup', () => { this.dragStart = null; });
+    this.input.on('pointerup', (p) => { if (p.id === this.dragId) this.dragStart = null; });
     this.keys = this.input.keyboard?.addKeys('LEFT,RIGHT,UP,DOWN,A,D,W,S');
 
     // ----- collisions -----
@@ -131,7 +134,7 @@ export default class Game extends Phaser.Scene {
     // Pause automatically when the app goes to the background.
     const onHidden = () => this.pauseGame();
     this.game.events.on('hidden', onHidden);
-    this.events.on('resume', () => { this.dragStart = null; });
+    this.events.on('resume', () => { this.dragStart = null; this.dragId = null; });
     this.events.once('shutdown', () => this.game.events.off('hidden', onHidden));
 
     this.spawner.start();
@@ -214,7 +217,7 @@ export default class Game extends Phaser.Scene {
     // Main blaster
     this.cd.main -= dt;
     if (this.cd.main <= 0 && hasTargets) {
-      this.cd.main = 1 / s.fireRate;
+      this.cd.main = Math.max(this.cd.main, -dt) + 1 / s.fireRate;
       const n = s.projectiles;
       for (let i = 0; i < n; i++) {
         const off = i - (n - 1) / 2;
@@ -228,7 +231,7 @@ export default class Game extends Phaser.Scene {
       this.cd.spread -= dt;
       if (this.cd.spread <= 0 && hasTargets) {
         const st = STANCE_STATS.spread(L.spread);
-        this.cd.spread = st.every / rateF;
+        this.cd.spread = Math.max(this.cd.spread, -dt) + st.every / rateF;
         for (let i = 0; i < st.shots; i++) {
           this.fireBullet(px, py, -90 - st.arc / 2 + (st.arc * i) / (st.shots - 1), s.damage * 0.7, {
             pierce: s.pierce + st.pierce, tint: 0xffd23f, scale: 0.85,
@@ -241,6 +244,7 @@ export default class Game extends Phaser.Scene {
     this.laserGfx.clear();
     if (L.laser) {
       const st = STANCE_STATS.laser(L.laser);
+      this.cd.laser -= dt;
       if (this.laserTime > 0) {
         this.laserTime -= dt;
         this.laserTick -= dt;
@@ -259,13 +263,10 @@ export default class Game extends Phaser.Scene {
             if (Math.abs(c.x - px) < w / 2 + CHEST_RADIUS && c.y < py) this.damageChest(c, dmg);
           }
         }
-      } else {
-        this.cd.laser -= dt;
-        if (this.cd.laser <= 0 && hasTargets) {
-          this.cd.laser = st.every;
-          this.laserTime = st.duration;
-          sfx.laser();
-        }
+      } else if (this.cd.laser <= 0 && hasTargets) {
+        this.cd.laser = st.every; // time from one beam start to the next
+        this.laserTime = st.duration;
+        sfx.laser();
       }
     }
 
@@ -378,7 +379,7 @@ export default class Game extends Phaser.Scene {
       if (b.active && (b.y < -20 || b.x < -20 || b.x > W + 20)) b.disableBody(true, true);
     }
     for (const b of this.enemyBullets.getChildren()) {
-      if (b.active && b.y > H + 10) b.disableBody(true, true);
+      if (b.active && (b.y > H + 10 || b.y < -20 || b.x < -20 || b.x > W + 20)) b.disableBody(true, true);
     }
     for (const m of this.missiles.getChildren()) {
       if (!m.active) continue;
@@ -497,14 +498,18 @@ export default class Game extends Phaser.Scene {
     const def = ENEMIES[type];
     const e = this.physics.add.sprite(x, y, def.tex).setScale(def.scale ?? SPRITE_SCALE).setDepth(5);
     this.enemies.add(e);
-    const r = Math.min(e.width, e.height) * 0.45;
-    e.body.setCircle(r, e.width / 2 - r, e.height / 2 - r);
+    if (def.wideBody) {
+      e.body.setSize(e.width * 0.9, e.height * 0.8);
+    } else {
+      const r = Math.min(e.width, e.height) * 0.45;
+      e.body.setCircle(r, e.width / 2 - r, e.height / 2 - r);
+    }
     e.def = def;
     e.type = type;
     // def.hits: dies after that many hits, whatever the damage.
     e.maxHp = e.hp = def.hits ? def.hits : def.boss ? def.hp * this.level.hpMult : def.hp * hpMult;
     e.speed = def.speed * this.level.speedMult * Phaser.Math.FloatBetween(0.9, 1.1);
-    e.baseX = def.boss ? W / 2 : x;
+    e.baseX = def.boss ? W / 2 : def.wobble ? Phaser.Math.Clamp(x, 24 + def.wobble, W - 24 - def.wobble) : x;
     e.t = Math.random() * 10;
     e.shootT = def.shoot ? def.shoot.every * Phaser.Math.FloatBetween(0.5, 1) : 0;
     e.holdY = def.hold ? Phaser.Math.Between(def.hold[0], def.hold[1]) : null;

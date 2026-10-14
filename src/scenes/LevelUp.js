@@ -78,9 +78,16 @@ export default class LevelUp extends Phaser.Scene {
       d.setWordWrapWidth(228);
       c.add(d);
       c.setSize(328, ch).setInteractive({ useHandCursor: true });
-      c.on('pointerdown', () => c.setScale(0.97));
-      c.on('pointerout', () => c.setScale(1));
-      c.on('pointerup', () => this.choose(p));
+      // A card is chosen only by a tap that starts on it, so lifting the finger that was
+      // moving the cell when this screen opened doesn't pick a card blindly.
+      c.on('pointerdown', () => { c.pressed = true; c.setScale(0.97); });
+      c.on('pointerout', () => { c.pressed = false; c.setScale(1); });
+      c.on('pointerup', () => {
+        const wasPressed = c.pressed;
+        c.pressed = false;
+        c.setScale(1);
+        if (wasPressed) this.choose(p);
+      });
       c.setAlpha(0).setScale(0.85);
       this.tweens.add({ targets: c, alpha: 1, scale: 1, delay: i * 70, duration: 200, ease: 'Back.out' });
       this.cards.add(c);

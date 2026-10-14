@@ -39,14 +39,19 @@ export function button(scene, x, y, w, h, label, onClick, opts = {}) {
   }
   c.setSize(w, h);
   c.setInteractive({ useHandCursor: true });
-  c.on('pointerdown', () => enabled && c.setScale(0.95));
-  c.on('pointerout', () => c.setScale(1));
+  // Only a tap that starts on the button counts: lifting a finger that was dragging
+  // somewhere else (e.g. moving the cell) must not press it.
+  let pressed = false;
+  c.on('pointerdown', () => { pressed = true; if (enabled) c.setScale(0.95); });
+  c.on('pointerout', () => { pressed = false; c.setScale(1); });
   let last = 0;
   c.on('pointerup', () => {
     c.setScale(1);
+    const wasPressed = pressed;
+    pressed = false;
     // Ignore duplicate events (touch + emulated mouse) and double taps.
     const now = performance.now();
-    if (!enabled || now - last < 300) return;
+    if (!enabled || !wasPressed || now - last < 300) return;
     last = now;
     sfx.click();
     onClick();
