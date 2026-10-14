@@ -21,7 +21,7 @@ const BACKGROUNDS = [
 // add ~6-8% net power per level (they get pricier, and enemies adapt to them), so bigger
 // steps make the first wave of a new level a wall. Later levels also get harder through
 // more waves, faster spawns, more enemy types and more damage.
-const HP_MULT = [1, 1.12, 1.24, 1.36, 1.48, 1.6, 1.72, 1.84, 1.96, 2.1];
+const HP_MULT = [1, 1.12, 1.24, 1.36, 1.48, 1.6, 1.7, 1.8, 1.9, 2.0];
 
 // Early levels: mostly basic viruses and slow tanks. Drifters (3 hits) from level 3,
 // fast germs (1 hit) from level 4.
@@ -43,7 +43,7 @@ export const LEVELS = NAMES.map((name, i) => {
     waves: 8 + Math.floor(n / 3), // last wave is always the boss
     hpMult: HP_MULT[i],
     speedMult: 1 + 0.03 * i,
-    dmgMult: 1 + 0.1 * i,
+    dmgMult: 1 + 0.07 * i,
     pool: poolFor(n),
     clearCoins: 40 + 30 * n,
     clearDna: n % 3 === 0 ? 10 : 3,
@@ -53,7 +53,7 @@ export const LEVELS = NAMES.map((name, i) => {
 // Enemies per wave and spawn rhythm. Waves get longer and faster.
 export function waveSpec(level, wave) {
   return {
-    count: 8 + wave * 4 + level.n,
+    count: 8 + wave * 4 + Math.round(level.n / 2),
     interval: Math.max(0.28, 1.05 - wave * 0.06 - level.n * 0.02),
     hpMult: level.hpMult * (1 + 0.16 * (wave - 1)),
     elites: wave >= 4 && wave % 3 === 1 ? 1 + Math.floor(level.n / 4) : 0,
