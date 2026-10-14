@@ -41,8 +41,15 @@ export function button(scene, x, y, w, h, label, onClick, opts = {}) {
   c.setInteractive({ useHandCursor: true });
   // Only a tap that starts on the button counts: lifting a finger that was dragging
   // somewhere else (e.g. moving the cell) must not press it.
+  // opts.armAfter (ms): ignore touches for a moment after the button appears, so a finger
+  // that is still on the screen from gameplay can't press it by accident.
+  const armedAt = performance.now() + (opts.armAfter || 0);
   let pressed = false;
-  c.on('pointerdown', () => { pressed = true; if (enabled) c.setScale(0.95); });
+  c.on('pointerdown', () => {
+    if (performance.now() < armedAt) return;
+    pressed = true;
+    if (enabled) c.setScale(0.95);
+  });
   c.on('pointerout', () => { pressed = false; c.setScale(1); });
   let last = 0;
   c.on('pointerup', () => {

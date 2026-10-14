@@ -5,6 +5,7 @@ import { Monetization } from '../services/monetization.js';
 import { button, text } from '../ui/widgets.js';
 
 const TAKE_ALL_Y = H - 102;
+const ARM_DELAY = 600; // ms
 const CARDS_TOP = 146;
 const CARDS_BOTTOM = TAKE_ALL_Y - 20 - 10; // button half-height + border/margin
 
@@ -18,6 +19,9 @@ export default class LevelUp extends Phaser.Scene {
     this.game_ = this.scene.get('Game');
     this.chosen = false;
     this.adBusy = false;
+    // Ignore touches for a moment after the screen appears: the player's finger is usually
+    // still on the screen from steering the cell.
+    this.readyAt = performance.now() + ARM_DELAY;
     this.add.rectangle(0, 0, W, H, 0x000000, 0.72).setOrigin(0).setInteractive();
     const chest = data.source === 'chest';
     const title = text(this, W / 2, 92, chest ? 'BONUS CHEST!' : 'LEVEL UP!', 32, chest ? '#ffd23f' : '#7dff7a');
@@ -32,13 +36,13 @@ export default class LevelUp extends Phaser.Scene {
         this.chosen = true;
         this.picks.forEach((p) => this.game_.applyChoice(p));
         this.finish();
-      }), { color: 0xc77d00, size: 14 });
+      }), { color: 0xc77d00, size: 14, armAfter: ARM_DELAY });
     }
 
     const reroll = button(this, W / 2, H - 50, 230, 40, 'REROLL  (watch ad)', () => this.withAd('reroll', () => {
       reroll.setEnabled(false).setLabel('REROLLED');
       this.renderCards(rollCards(this.game_, data.picks.length));
-    }), { color: 0x8a6d00, size: 14 });
+    }), { color: 0x8a6d00, size: 14, armAfter: ARM_DELAY });
 
     if (AUTOPLAY) this.time.delayedCall(150, () => this.choose(this.picks[0]));
   }
@@ -80,7 +84,11 @@ export default class LevelUp extends Phaser.Scene {
       c.setSize(328, ch).setInteractive({ useHandCursor: true });
       // A card is chosen only by a tap that starts on it, so lifting the finger that was
       // moving the cell when this screen opened doesn't pick a card blindly.
-      c.on('pointerdown', () => { c.pressed = true; c.setScale(0.97); });
+      c.on('pointerdown', () => {
+        if (performance.now() < this.readyAt) return;
+        c.pressed = true;
+        c.setScale(0.97);
+      });
       c.on('pointerout', () => { c.pressed = false; c.setScale(1); });
       c.on('pointerup', () => {
         const wasPressed = c.pressed;

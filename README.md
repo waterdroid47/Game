@@ -8,9 +8,10 @@ You are a cell guarding the body. Slide your finger to move: left and right, and
   - teal drifters from level 3: they sway slowly and always take 3 hits;
   - fast yellow germs from level 4: they pop in one hit;
   - shooters from level 4, plus elites and a boss in every level.
-- **Level-ups:** kill enemies to level up, then pick 1 of 3 upgrades. Each card shows exactly what changes, and maxed-out upgrades are never offered. These are stronger shots or new **attack stances**: Spread Shot, Enzyme Laser, Antibody Ring, Homing Phage and Immune Pulse. Each stance evolves at level 5.
+- **Level-ups:** kill enemies to level up: twice in the first wave, then once per wave. Pick 1 of 3 upgrades. Each card shows exactly what changes, and maxed-out upgrades are never offered. These are stronger shots or new **attack stances**: Spread Shot, Enzyme Laser, Antibody Ring, Homing Phage and Immune Pulse. Each stance evolves at level 5.
 - **Bonus chests:** catch the ones that fall from elite enemies, or shoot them open, for extra upgrades.
 - **Rewarded ads:** watch one to revive, double your coins, or reroll the cards. Once per run, an ad can also **TAKE ALL** the cards on a bonus screen.
+- **10 levels**, each a part of the body with its own colours. Enemies get tougher with every wave and every level.
 - **Shop:** between runs, spend **coins** on permanent upgrades. **DNA**, from bosses, ads and the store, buys the strongest ones.
 
 ## Play / develop

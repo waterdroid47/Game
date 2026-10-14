@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { AUTOPLAY, DEBUG, H, MEMBRANE_Y, MOVE_TOP, PLAYER_Y, SPEED, SPRITE_SCALE, W } from '../config.js';
 import { ENEMIES } from '../data/enemies.js';
-import { LEVELS, xpFor } from '../data/levels.js';
+import { LEVELS, LEVEL_UPS } from '../data/levels.js';
 import { metaStats } from '../data/shop.js';
 import { CARDS, STANCES, STANCE_MAX, STANCE_STATS, canTake, rollCards } from '../data/upgrades.js';
 import { Monetization } from '../services/monetization.js';
@@ -30,7 +30,7 @@ export default class Game extends Phaser.Scene {
     this.tweens.timeScale = SPEED;
     this.physics.world.timeScale = 1 / SPEED;
 
-    this.bg = this.add.tileSprite(0, 0, W, H, 'bg').setOrigin(0).setTint(this.level.tint);
+    this.bg = this.add.tileSprite(0, 0, W, H, `bg_${this.level.n}`).setOrigin(0);
     this.add.tileSprite(0, MEMBRANE_Y, W, 18, 'membrane').setOrigin(0, 0).setTileScale(3, 3).setDepth(2);
     this.add.rectangle(0, MEMBRANE_Y + 18, W, H - MEMBRANE_Y - 18, 0x3a0d20).setOrigin(0).setDepth(2);
 
@@ -53,9 +53,10 @@ export default class Game extends Phaser.Scene {
     this.stances = { spread: 0, laser: 0, orbit: 0, missile: 0, pulse: 0 };
     this.cardLevels = {};
     this.hp = this.stats.maxHp;
-    this.xp = 0;
     this.runLevel = 1;
-    this.xpNext = xpFor(1);
+    this.waveXp = 0;
+    this.xpSteps = [];
+    this.xpStep = 0;
     this.levelUpQueue = [];
     this.kills = 0;
     this.coinsEarned = 0;
@@ -69,7 +70,7 @@ export default class Game extends Phaser.Scene {
     this.takeAllUsed = false;
     this.graveyard = [];
     this.floatCount = 0;
-    this.cd = { main: 0.5, spread: 1, laser: 2, missile: 1.5, pulse: 2, chest: Phaser.Math.Between(30, 45) };
+    this.cd = { main: 0.5, spread: 1, laser: 2, missile: 1.5, pulse: 2, chest: Phaser.Math.Between(45, 60) };
     this.laserTime = 0;
     this.laserTick = 0;
     this.orbitAngle = 0;
@@ -415,7 +416,7 @@ export default class Game extends Phaser.Scene {
     if (!this.spawner.isBoss) {
       this.cd.chest -= dt;
       if (this.cd.chest <= 0) {
-        this.cd.chest = Phaser.Math.Between(50, 80);
+        this.cd.chest = Phaser.Math.Between(90, 120);
         this.dropChest(Phaser.Math.Between(40, W - 40), -10, Math.random() < 0.15);
       }
     }
@@ -730,14 +731,34 @@ export default class Game extends Phaser.Scene {
     this.hp = Math.min(this.stats.maxHp, this.hp + n);
   }
 
+  // Called by the spawner when a wave starts, with the enemy types it will spawn.
+  // Level-ups happen at fixed shares of the wave's total XP: two in wave 1, then one per wave.
+  startWaveXp(wave, types) {
+    const xpOf = (t) => {
+      const d = ENEMIES[t];
+      return d.xp + (d.split ? d.split.count * xpOf(d.split.into) : 0);
+    };
+    const total = types.reduce((a, t) => a + xpOf(t), 0);
+    const shares = wave === 1 ? LEVEL_UPS.first : LEVEL_UPS.other;
+    this.xpSteps = shares.map((f) => Math.max(1, Math.round(total * f)));
+    this.xpStep = 0;
+    this.waveXp = 0;
+  }
+
   gainXp(n) {
-    this.xp += n * this.stats.xpMult;
-    while (this.xp >= this.xpNext) {
-      this.xp -= this.xpNext;
+    this.waveXp += n * this.stats.xpMult;
+    while (this.xpStep < this.xpSteps.length && this.waveXp >= this.xpSteps[this.xpStep]) {
+      this.xpStep += 1;
       this.runLevel += 1;
-      this.xpNext = xpFor(this.runLevel);
       this.levelUpQueue.push('xp');
     }
+  }
+
+  // 0..1 progress towards this wave's next level-up (1 = all done for this wave).
+  xpProgress() {
+    if (this.xpStep >= this.xpSteps.length) return 1;
+    const from = this.xpStep ? this.xpSteps[this.xpStep - 1] : 0;
+    return Phaser.Math.Clamp((this.waveXp - from) / (this.xpSteps[this.xpStep] - from), 0, 1);
   }
 
   openLevelUp(source) {
@@ -798,9 +819,9 @@ export default class Game extends Phaser.Scene {
           c.destroy();
           this.revive();
         }
-      }, { color: 0x8a6d00, size: 17 }));
+      }, { color: 0x8a6d00, size: 17, armAfter: 600 }));
     }
-    c.add(button(this, W / 2, 430, 200, 44, 'GIVE UP', () => { c.destroy(); this.finish(false); }, { color: 0x663333 }));
+    c.add(button(this, W / 2, 430, 200, 44, 'GIVE UP', () => { c.destroy(); this.finish(false); }, { color: 0x663333, armAfter: 600 }));
   }
 
   revive() {
@@ -880,7 +901,8 @@ export default class Game extends Phaser.Scene {
     g.fillStyle(0xff3b5c, 1).fillRect(6, 6, (118 * this.hp) / this.stats.maxHp, 18);
     g.fillStyle(0xffffff, 0.25).fillRect(6, 6, (118 * this.hp) / this.stats.maxHp, 4);
     g.fillStyle(0x000000, 1).fillRect(0, 30, W, 9);
-    g.fillStyle(0x9d74ff, 1).fillRect(1, 31, ((W - 2) * this.xp) / this.xpNext, 7);
+    const waveDone = this.xpStep >= this.xpSteps.length;
+    g.fillStyle(waveDone ? 0x5a4a80 : 0x9d74ff, 1).fillRect(1, 31, (W - 2) * this.xpProgress(), 7);
     this.hpText.setText(`${Math.ceil(this.hp)}/${Math.round(this.stats.maxHp)}`);
     this.waveText.setText(`WAVE ${this.spawner.wave}/${this.level.waves}`);
     this.coinText.setText(String(Math.round(this.coinsEarned * this.stats.coinMult)));

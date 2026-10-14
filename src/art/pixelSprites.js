@@ -200,7 +200,7 @@ const SPRITES = {
     rows: ['...y...', '...y...', 'yyyyyyy', '.yyyyy.', '..yyy..', '.yy.yy.', 'yo...oy'],
   },
   starEmpty: {
-    pal: { y: '#4a3a40', o: '#2a1f24' },
+    pal: { y: '#1c1216', o: '#0d0809' },
     rows: ['...y...', '...y...', 'yyyyyyy', '.yyyyy.', '..yyy..', '.yy.yy.', 'yo...oy'],
   },
   px: { pal: { w: '#ffffff' }, rows: ['ww', 'ww'] },
@@ -290,12 +290,12 @@ function drawBoss(scene) {
   tex.refresh();
 }
 
-// A dark, tileable "tissue" background with faint blood cells.
-function drawBackground(scene) {
+// A dark, tileable "tissue" background with faint cells, in the given colours.
+function drawBackground(scene, key = 'bg', [base, cell, rim] = ['#1e0812', '#2f0d1c', '#3a1022']) {
   const s = 48;
-  const tex = scene.textures.createCanvas('bg', s, s);
+  const tex = scene.textures.createCanvas(key, s, s);
   const ctx = tex.getContext();
-  ctx.fillStyle = '#1e0812';
+  ctx.fillStyle = base;
   ctx.fillRect(0, 0, s, s);
   const blobs = [
     [8, 10, 4],
@@ -309,21 +309,22 @@ function drawBackground(scene) {
       for (let x = -r; x <= r; x++) {
         const d = x * x + y * y;
         if (d > r * r) continue;
-        ctx.fillStyle = d < (r - 1.5) * (r - 1.5) ? '#2f0d1c' : '#3a1022';
+        ctx.fillStyle = d < (r - 1.5) * (r - 1.5) ? cell : rim;
         ctx.fillRect((bx + x + s) % s, (by + y + s) % s, 1, 1);
       }
     }
   }
-  ctx.fillStyle = '#2a0b18';
+  ctx.fillStyle = cell;
   for (let i = 0; i < 18; i++) ctx.fillRect((i * 17) % s, (i * 29) % s, 1, 1);
   tex.refresh();
 }
 
-export function createTextures(scene) {
+export function createTextures(scene, levels = []) {
   for (const [key, def] of Object.entries(SPRITES)) draw(scene, key, def.rows, def.pal);
   for (const [key, rows] of Object.entries(ICONS)) draw(scene, key, rows, { w: '#ffffff' });
   drawBoss(scene);
   drawBackground(scene);
+  for (const lvl of levels) drawBackground(scene, `bg_${lvl.n}`, lvl.bg);
 }
 
 export { SPRITES };

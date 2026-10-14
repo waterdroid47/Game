@@ -37,6 +37,7 @@ export default class WaveSpawner {
       }
       this.interval = this.spec.interval;
     }
+    this.game.startWaveXp(this.wave, this.queue);
     this.state = 'spawning';
     this.timer = 1.4;
     this.game.showBanner(this.isBoss ? 'BOSS WAVE!' : `WAVE ${this.wave}`, this.isBoss ? '#ff4d6d' : '#ffffff');
