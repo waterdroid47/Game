@@ -21,7 +21,17 @@ export default class LevelUp extends Phaser.Scene {
     this.cards = this.add.container(0, 0);
     this.renderCards(data.picks);
 
-    const reroll = button(this, W / 2, H - 56, 230, 42, 'REROLL  (watch ad)', async () => {
+    if (!this.game_.takeAllUsed) {
+      button(this, W / 2, H - 102, 230, 40, 'TAKE ALL  (watch ad)', async () => {
+        if (this.chosen || !(await Monetization.showRewardedAd('take_all'))) return;
+        this.game_.takeAllUsed = true;
+        this.chosen = true;
+        this.picks.forEach((p) => this.game_.applyChoice(p));
+        this.finish();
+      }, { color: 0xc77d00, size: 14 });
+    }
+
+    const reroll = button(this, W / 2, H - 50, 230, 40, 'REROLL  (watch ad)', async () => {
       if (!(await Monetization.showRewardedAd('reroll'))) return;
       reroll.setEnabled(false).setLabel('REROLLED');
       this.renderCards(rollCards(this.game_, data.picks.length));
@@ -66,6 +76,10 @@ export default class LevelUp extends Phaser.Scene {
     if (this.chosen) return;
     this.chosen = true;
     this.game_.applyChoice(p);
+    this.finish();
+  }
+
+  finish() {
     this.scene.stop();
     this.scene.resume('Game');
   }

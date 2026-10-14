@@ -64,6 +64,8 @@ export default class Game extends Phaser.Scene {
     this.finished = false;
     this.invuln = 0;
     this.boss = null;
+    this.bossDefeated = false;
+    this.takeAllUsed = false;
     this.graveyard = [];
     this.floatCount = 0;
     this.cd = { main: 0.5, spread: 1, laser: 2, missile: 1.5, pulse: 2, chest: Phaser.Math.Between(30, 45) };
@@ -150,7 +152,7 @@ export default class Game extends Phaser.Scene {
     this.updateChests(dt);
     this.updateHud();
 
-    if (this.levelUpQueue.length && !this.dead && !this.finished && !this.scene.isActive('LevelUp')) {
+    if (this.levelUpQueue.length && !this.dead && !this.finished && !this.bossDefeated && !this.scene.isActive('LevelUp')) {
       this.openLevelUp(this.levelUpQueue.shift());
     }
   }
@@ -406,7 +408,7 @@ export default class Game extends Phaser.Scene {
   }
 
   onPickup(_player, c) {
-    if (!c.active) return;
+    if (!c.active || this.bossDefeated) return;
     c.body.enable = false;
     c.setActive(false);
     this.graveyard.push(c);
@@ -573,15 +575,25 @@ export default class Game extends Phaser.Scene {
     const def = e.def;
     this.kills += 1;
     this.coinsEarned += def.coins;
-    this.gainXp(def.xp);
+    if (def.boss) {
+      // The level ends with the boss: from here on kills only pay coins (no XP, chests or level-ups).
+      this.bossDefeated = true;
+      this.levelUpQueue.length = 0;
+      for (const c of this.pickups.getChildren()) {
+        c.setActive(false).setVisible(false);
+        c.body.enable = false;
+        this.graveyard.push(c);
+      }
+    }
+    if (!this.bossDefeated) this.gainXp(def.xp);
     this.burst(e.x, e.y, ENEMY_COLORS[e.type] ?? 0xffffff, def.boss ? 80 : 12);
     sfx.kill();
-    if (def.split) {
+    if (def.split && !this.bossDefeated) {
       for (let i = 0; i < def.split.count; i++) {
         this.spawnEnemy(def.split.into, Phaser.Math.Clamp(e.x + (i ? 14 : -14), 12, W - 12), e.y, this.spawner.spec.hpMult);
       }
     }
-    if (def.chest) this.dropChest(e.x, e.y, Math.random() < 0.1);
+    if (def.chest && !this.bossDefeated) this.dropChest(e.x, e.y, Math.random() < 0.1);
     this.removeEnemy(e);
     if (def.boss) {
       this.boss = null;

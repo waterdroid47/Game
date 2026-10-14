@@ -12,7 +12,7 @@ export const ENEMIES = {
   },
   elite: { tex: 'elite', hp: 150, speed: 15, dmg: 25, xp: 8, coins: 10, radius: 20, chest: true, scale: 3 },
   boss: {
-    tex: 'boss', hp: 1500, speed: 22, dmg: 40, xp: 20, coins: 80, radius: 44, boss: true, scale: 3,
+    tex: 'boss', hp: 1500, speed: 22, dmg: 40, xp: 0, coins: 120, radius: 44, boss: true, scale: 3,
     hold: [130, 130], shoot: { every: 1.9, speed: 150, dmg: 9, count: 5, spread: 60 }, summon: { every: 5, type: 'virus', count: 2 },
   },
 };

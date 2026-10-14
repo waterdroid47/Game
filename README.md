@@ -5,7 +5,7 @@ A mobile roguelike cell-defense shooter, built with [Phaser 3](https://phaser.io
 You are a cell guarding the body. Slide your finger left and right, and you shoot automatically. Waves of viruses, germs and bacteria get stronger every wave.
 - **Level-ups:** kill enemies to level up, then pick 1 of 3 upgrades. These are stronger shots or new **attack stances**: Spread Shot, Enzyme Laser, Antibody Ring, Homing Phage and Immune Pulse. Each stance evolves at level 5.
 - **Bonus chests:** catch the ones that fall from elite enemies for extra upgrades.
-- **Rewarded ads:** watch one to revive, double your coins, or reroll the cards.
+- **Rewarded ads:** watch one to revive, double your coins, or reroll the cards. Once per run, an ad can also **TAKE ALL** the cards on a bonus screen.
 - **Shop:** between runs, spend **coins** on permanent upgrades. **DNA**, from bosses, ads and the store, buys the strongest ones.
 
 ## Play / develop
