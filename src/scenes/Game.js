@@ -10,6 +10,7 @@ import WaveSpawner from '../systems/WaveSpawner.js';
 import { button, text } from '../ui/widgets.js';
 
 const BASE_FIRE_RATE = 2.6;
+const CHEST_RADIUS = 16;
 const ENEMY_COLORS = {
   virus: 0xe0335a, germ: 0xffd23f, tank: 0x7fae3a, splitter: 0x4aa8ff, mini: 0x4aa8ff,
   shooter: 0xff8a2a, elite: 0xc43cf0, boss: 0x56b53a,
@@ -114,6 +115,7 @@ export default class Game extends Phaser.Scene {
     this.physics.add.overlap(this.missiles, this.enemies, (m) => this.explodeMissile(m), null, this);
     this.physics.add.overlap(this.player, this.enemyBullets, this.onPlayerShot, null, this);
     this.physics.add.overlap(this.player, this.pickups, this.onPickup, null, this);
+    this.physics.add.overlap(this.bullets, this.pickups, this.onBulletHitChest, null, this);
 
     this.createHud();
     this.spawner = new WaveSpawner(this);
@@ -174,7 +176,7 @@ export default class Game extends Phaser.Scene {
   // Simple bot used for automated tests: chase the lowest enemy, grab chests, dodge shots.
   autoTarget() {
     let best = null;
-    for (const c of this.pickups.getChildren()) if (c.active && c.y > 250) return c.x;
+    for (const c of this.liveChests()) if (c.y > 40) return c.x;
     for (const e of this.enemies.getChildren()) {
       if (!e.active || e.dying || e.y < 0) continue;
       if (!best || e.y > best.y) best = e;
@@ -194,7 +196,7 @@ export default class Game extends Phaser.Scene {
     const L = this.stances;
     const px = this.player.x;
     const py = PLAYER_Y - 16;
-    const hasTargets = this.spawner.alive > 0;
+    const hasTargets = this.spawner.alive > 0 || this.liveChests().length > 0;
     const rateF = s.fireRate / BASE_FIRE_RATE;
 
     // Main blaster
@@ -243,6 +245,9 @@ export default class Game extends Phaser.Scene {
           for (const e of this.liveEnemies()) {
             if (Math.abs(e.x - px) < w / 2 + e.def.radius && e.y < py) this.damageEnemy(e, dmg, false);
           }
+          for (const c of this.liveChests()) {
+            if (Math.abs(c.x - px) < w / 2 + CHEST_RADIUS && c.y < py) this.damageChest(c, dmg);
+          }
         }
       } else {
         this.cd.laser -= dt;
@@ -268,6 +273,13 @@ export default class Game extends Phaser.Scene {
           if (Phaser.Math.Distance.Between(o.x, o.y, e.x, e.y) < e.def.radius + 9) {
             e.orbitHitT = 0.35;
             this.damageEnemy(e, dmg, true);
+          }
+        }
+        for (const c of this.liveChests()) {
+          if (c.orbitHitT > 0) continue;
+          if (Phaser.Math.Distance.Between(o.x, o.y, c.x, c.y) < CHEST_RADIUS + 9) {
+            c.orbitHitT = 0.35;
+            this.damageChest(c, dmg);
           }
         }
         for (const b of this.enemyBullets.getChildren()) {
@@ -312,6 +324,9 @@ export default class Game extends Phaser.Scene {
             this.damageEnemy(e, dmg, true);
             if (evolved && !e.def.boss) e.knock = 220;
           }
+        }
+        for (const c of this.liveChests()) {
+          if (Phaser.Math.Distance.Between(px, PLAYER_Y, c.x, c.y) < R + CHEST_RADIUS) this.damageChest(c, dmg);
         }
         for (const b of this.enemyBullets.getChildren()) {
           if (b.active && Phaser.Math.Distance.Between(px, PLAYER_Y, b.x, b.y) < R) b.disableBody(true, true);
@@ -375,6 +390,9 @@ export default class Game extends Phaser.Scene {
     for (const e of this.liveEnemies()) {
       if (Phaser.Math.Distance.Between(m.x, m.y, e.x, e.y) < m.aoe + e.def.radius) this.damageEnemy(e, m.damage, true);
     }
+    for (const c of this.liveChests()) {
+      if (Phaser.Math.Distance.Between(m.x, m.y, c.x, c.y) < m.aoe + CHEST_RADIUS) this.damageChest(c, m.damage);
+    }
     this.burst(m.x, m.y, 0xff6a3d, 14);
     const ring = this.add.circle(m.x, m.y, m.aoe, 0xff6a3d, 0.3).setDepth(6);
     this.tweens.add({ targets: ring, alpha: 0, scale: 1.3, duration: 220, onComplete: () => ring.destroy() });
@@ -390,6 +408,13 @@ export default class Game extends Phaser.Scene {
         this.dropChest(Phaser.Math.Between(40, W - 40), -10, Math.random() < 0.15);
       }
     }
+    for (const c of this.liveChests()) {
+      c.orbitHitT -= dt;
+      if (c.flashT > 0) {
+        c.flashT -= dt;
+        if (c.flashT <= 0) c.clearTint();
+      }
+    }
     for (const c of this.pickups.getChildren()) {
       if (c.active && c.y > MEMBRANE_Y + 12) {
         this.tweens.add({ targets: c, alpha: 0, duration: 200, onComplete: () => c.destroy() });
@@ -402,12 +427,44 @@ export default class Game extends Phaser.Scene {
   dropChest(x, y, rare) {
     const c = this.pickups.create(x, y, rare ? 'chestRare' : 'chest').setScale(3).setDepth(6);
     c.rare = rare;
+    // Chests can be caught, or shot open: about 4 main shots (6 for a rare chest).
+    c.maxHp = c.hp = this.stats.damage * (rare ? 6 : 4);
+    c.flashT = 0;
+    c.orbitHitT = 0;
     c.setVelocityY(75);
     this.tweens.add({ targets: c, angle: { from: -8, to: 8 }, duration: 400, yoyo: true, repeat: -1 });
     if (rare) this.tweens.add({ targets: c, alpha: 0.6, duration: 200, yoyo: true, repeat: -1 });
   }
 
+  liveChests() {
+    return this.pickups.getChildren().filter((c) => c.active);
+  }
+
+  onBulletHitChest(b, c) {
+    if (!b.active || !c.active || b.hit.has(c)) return;
+    b.hit.add(c);
+    this.damageChest(c, b.damage);
+    if (b.pierce > 0) {
+      b.pierce -= 1;
+      return;
+    }
+    b.disableBody(true, true);
+  }
+
+  damageChest(c, dmg) {
+    if (!c.active || this.bossDefeated) return;
+    c.hp -= dmg;
+    c.setTintFill(0xffffff);
+    c.flashT = 0.05;
+    if (c.hp <= 0) this.openChest(c);
+  }
+
   onPickup(_player, c) {
+    this.openChest(c);
+  }
+
+  // Caught or shot open: both give the bonus.
+  openChest(c) {
     if (!c.active || this.bossDefeated) return;
     c.body.enable = false;
     c.setActive(false);
@@ -801,6 +858,12 @@ export default class Game extends Phaser.Scene {
       g.fillStyle(0x56b53a, 1).fillRect(40, 58, ((W - 80) * Math.max(0, this.boss.hp)) / this.boss.maxHp, 10);
       this.bossText.setText('GIANT BACTERIUM');
     } else this.bossText.setText('');
+    for (const c of this.liveChests()) {
+      if (c.hp >= c.maxHp) continue;
+      const w = 26;
+      bg.fillStyle(0x000000, 0.8).fillRect(c.x - w / 2 - 1, c.y - c.displayHeight / 2 - 9, w + 2, 5);
+      bg.fillStyle(0xffd23f, 1).fillRect(c.x - w / 2, c.y - c.displayHeight / 2 - 8, (w * Math.max(0, c.hp)) / c.maxHp, 3);
+    }
     // Small health bars over tough enemies.
     for (const e of this.liveEnemies()) {
       if (e.def.boss || e.hp >= e.maxHp || e.maxHp < 30) continue;
