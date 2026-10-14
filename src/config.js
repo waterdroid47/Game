@@ -2,7 +2,8 @@
 export const W = 360;
 export const H = 640;
 
-export const PLAYER_Y = 560;
+export const PLAYER_Y = 560; // lowest (starting) position of the player
+export const MOVE_TOP = 330; // the player can move up to here
 export const MEMBRANE_Y = 592;
 export const SPRITE_SCALE = 3;
 
