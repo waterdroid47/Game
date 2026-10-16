@@ -21,4 +21,5 @@ export const ENEMIES = {
   },
 };
 
-export const BOSS = 'dragon';
+export const BOSS = 'dragon'; // last wave of every level
+export const ELITE = 'ogre'; // mini-boss that drops a treasure chest (from wave 4)

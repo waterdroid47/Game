@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { W } from '../config.js';
-import { BOSS } from '../data/enemies.js';
+import { BOSS, ELITE } from '../data/enemies.js';
 import { waveSpec } from '../data/levels.js';
 
 // Spawns the enemies of each wave and moves on to the next wave when the screen is clear.
@@ -34,7 +34,7 @@ export default class WaveSpawner {
       for (let i = 0; i < this.spec.count; i++) this.queue.push(this.pick());
       for (let i = 0; i < this.spec.elites; i++) {
         const at = Phaser.Math.Between(Math.floor(this.queue.length / 2), this.queue.length);
-        this.queue.splice(at, 0, 'elite');
+        this.queue.splice(at, 0, ELITE);
       }
       this.interval = this.spec.interval;
     }
