@@ -19,48 +19,48 @@ const arrow = (a, b) => `${a} -> ${b}`;
 // desc(next level, stats now) – what taking this card changes.
 export const STANCES = {
   spread: {
-    name: 'Spread Shot', icon: 'ic_spread', color: 0xffd23f,
+    name: 'Fire Fan', icon: 'ic_spread', color: 0xffd23f,
     desc: (l) => {
       const [a, b] = [STANCE_STATS.spread(l - 1), STANCE_STATS.spread(l)];
-      if (l === 1) return `Fires a fan of ${b.shots} shots`;
+      if (l === 1) return `Throws a fan of ${b.shots} fire bolts`;
       if (l === STANCE_MAX) return `EVOLVED: fan of ${b.shots} piercing shots`;
       return `Shots per fan ${arrow(a.shots, b.shots)}, fires faster`;
     },
   },
   laser: {
-    name: 'Enzyme Laser', icon: 'ic_laser', color: 0xff4df0,
+    name: 'Lightning Beam', icon: 'ic_laser', color: 0x8fe8ff,
     desc: (l) => {
       const [a, b] = [STANCE_STATS.laser(l - 1), STANCE_STATS.laser(l)];
-      if (l === 1) return `Burning beam straight up, every ${f1(b.every)}s`;
-      if (l === STANCE_MAX) return `EVOLVED: huge beam every ${f1(b.every)}s`;
+      if (l === 1) return `Lightning strikes straight up, every ${f1(b.every)}s`;
+      if (l === STANCE_MAX) return `EVOLVED: huge storm beam every ${f1(b.every)}s`;
       return `Beam width ${arrow(a.width, b.width)}, every ${arrow(f1(a.every), f1(b.every))}s`;
     },
   },
   orbit: {
-    name: 'Antibody Ring', icon: 'ic_orbit', color: 0x4ae8ff,
+    name: 'Shield Orbit', icon: 'ic_orbit', color: 0x4ae8ff,
     desc: (l) => {
       const [a, b] = [STANCE_STATS.orbit(l - 1), STANCE_STATS.orbit(l)];
-      if (l === 1) return '1 antibody orbits you, hitting enemies and blocking shots';
-      if (l === STANCE_MAX) return `EVOLVED: ${b.count} antibodies, wider ring`;
-      return `Antibodies ${arrow(a.count, b.count)}`;
+      if (l === 1) return '1 magic shield circles you, hitting monsters and blocking shots';
+      if (l === STANCE_MAX) return `EVOLVED: ${b.count} shields, wider ring`;
+      return `Shields ${arrow(a.count, b.count)}`;
     },
   },
   missile: {
-    name: 'Homing Phage', icon: 'ic_missile', color: 0xff6a3d,
+    name: 'Spirit Missiles', icon: 'ic_missile', color: 0xff6a3d,
     desc: (l) => {
       const [a, b] = [STANCE_STATS.missile(l - 1), STANCE_STATS.missile(l)];
-      if (l === 1) return `1 homing missile every ${f1(b.every)}s`;
-      if (l === STANCE_MAX) return `EVOLVED: ${b.count} big explosive missiles every ${f1(b.every)}s`;
-      return `Missiles per volley ${arrow(a.count, b.count)}`;
+      if (l === 1) return `1 homing spirit every ${f1(b.every)}s`;
+      if (l === STANCE_MAX) return `EVOLVED: ${b.count} big exploding spirits every ${f1(b.every)}s`;
+      return `Spirits per volley ${arrow(a.count, b.count)}`;
     },
   },
   pulse: {
-    name: 'Immune Pulse', icon: 'ic_pulse', color: 0x7dff7a,
+    name: 'Shockwave', icon: 'ic_pulse', color: 0x6ab8ff,
     desc: (l) => {
       const [a, b] = [STANCE_STATS.pulse(l - 1), STANCE_STATS.pulse(l)];
-      if (l === 1) return `Shockwave hits everything near you, every ${f1(b.every)}s`;
-      if (l === STANCE_MAX) return 'EVOLVED: huge pulse that knocks enemies back';
-      return `Pulse size ${arrow(a.radius, b.radius)}, every ${arrow(f1(a.every), f1(b.every))}s`;
+      if (l === 1) return `A shockwave hits everything near you, every ${f1(b.every)}s`;
+      if (l === STANCE_MAX) return 'EVOLVED: huge shockwave that knocks monsters back';
+      return `Wave size ${arrow(a.radius, b.radius)}, every ${arrow(f1(a.every), f1(b.every))}s`;
     },
   },
 };
@@ -68,15 +68,15 @@ export const STANCES = {
 // Stat cards. max = how many times the card can be taken in one run.
 // desc(stats) shows the change from the current value.
 export const CARDS = [
-  { id: 'dmg', name: 'Sharp Enzymes', icon: 'ic_dmg', color: 0xff5a5a, desc: (s) => `Damage ${arrow(f1(s.damage), f1(s.damage * 1.2))}`, apply: (s) => { s.damage *= 1.2; } },
-  { id: 'rate', name: 'Fast Ribosomes', icon: 'ic_rate', color: 0x7ff9ff, desc: (s) => `Shots per second ${arrow(f1(s.fireRate), f1(s.fireRate * 1.15))}`, apply: (s) => { s.fireRate *= 1.15; } },
+  { id: 'dmg', name: 'Sharp Bolts', icon: 'ic_dmg', color: 0xff5a5a, desc: (s) => `Damage ${arrow(f1(s.damage), f1(s.damage * 1.2))}`, apply: (s) => { s.damage *= 1.2; } },
+  { id: 'rate', name: 'Quick Hands', icon: 'ic_rate', color: 0x7ff9ff, desc: (s) => `Shots per second ${arrow(f1(s.fireRate), f1(s.fireRate * 1.15))}`, apply: (s) => { s.fireRate *= 1.15; } },
   { id: 'multi', name: 'Twin Shot', icon: 'ic_multi', color: 0x7ff9ff, max: 4, desc: (s) => `Main shots ${arrow(s.projectiles, s.projectiles + 1)}`, apply: (s) => { s.projectiles += 1; } },
-  { id: 'pierce', name: 'Piercing', icon: 'ic_pierce', color: 0xffffff, max: 3, desc: (s) => `Each shot passes through ${arrow(s.pierce, s.pierce + 1)} enemies`, apply: (s) => { s.pierce += 1; } },
+  { id: 'pierce', name: 'Piercing', icon: 'ic_pierce', color: 0xffffff, max: 3, desc: (s) => `Each shot passes through ${arrow(s.pierce, s.pierce + 1)} monsters`, apply: (s) => { s.pierce += 1; } },
   { id: 'crit', name: 'Critical Hit', icon: 'ic_crit', color: 0xffd23f, max: 5, desc: (s) => `Crit chance ${arrow(pct(s.crit), pct(s.crit + 0.1))} (double damage)`, apply: (s) => { s.crit += 0.1; } },
-  { id: 'ricochet', name: 'Ricochet', icon: 'ic_ricochet', color: 0xb0ff6a, max: 3, desc: (s) => `Shots bounce to ${arrow(s.ricochet, s.ricochet + 1)} more enemies`, apply: (s) => { s.ricochet += 1; } },
-  { id: 'size', name: 'Big Shots', icon: 'ic_size', color: 0xffa04d, max: 3, desc: (s) => `Bigger shots, damage ${arrow(f1(s.damage), f1(s.damage * 1.1))}`, apply: (s) => { s.bulletScale *= 1.25; s.damage *= 1.1; } },
-  { id: 'hp', name: 'Regenerate', icon: 'ic_hp', color: 0xff3b5c, desc: (s) => `Max HP ${arrow(Math.round(s.maxHp), Math.round(s.maxHp + 20))}, heal 40`, apply: (s, run) => { s.maxHp += 20; run.heal(40); } },
-  { id: 'speed', name: 'Flagellum', icon: 'ic_speed', color: 0xc0c0ff, max: 2, desc: (s) => `Shot speed +25%, shots per second ${arrow(f1(s.fireRate), f1(s.fireRate * 1.1))}`, apply: (s) => { s.bulletSpeed *= 1.25; s.fireRate *= 1.1; } },
+  { id: 'ricochet', name: 'Ricochet', icon: 'ic_ricochet', color: 0xb0ff6a, max: 3, desc: (s) => `Shots bounce to ${arrow(s.ricochet, s.ricochet + 1)} more monsters`, apply: (s) => { s.ricochet += 1; } },
+  { id: 'size', name: 'Heavy Bolts', icon: 'ic_size', color: 0xffa04d, max: 3, desc: (s) => `Bigger shots, damage ${arrow(f1(s.damage), f1(s.damage * 1.1))}`, apply: (s) => { s.bulletScale *= 1.25; s.damage *= 1.1; } },
+  { id: 'hp', name: 'Healing Potion', icon: 'ic_hp', color: 0xff3b5c, desc: (s) => `Max HP ${arrow(Math.round(s.maxHp), Math.round(s.maxHp + 20))}, heal 40`, apply: (s, run) => { s.maxHp += 20; run.heal(40); } },
+  { id: 'speed', name: 'Swift Bolts', icon: 'ic_speed', color: 0xc0c0ff, max: 2, desc: (s) => `Shot speed +25%, shots per second ${arrow(f1(s.fireRate), f1(s.fireRate * 1.1))}`, apply: (s) => { s.bulletSpeed *= 1.25; s.fireRate *= 1.1; } },
 ];
 
 // Can this card / stance still be taken in this run?

@@ -16,7 +16,7 @@ export default class Store extends Phaser.Scene {
     const refresh = currencyBar(this, Save);
     backButton(this);
     text(this, W / 2, 66, 'STORE', 26, '#ff9be6');
-    text(this, W / 2, 90, 'DNA buys the strongest upgrades', 10, '#c090a8');
+    text(this, W / 2, 90, 'Gems buy the strongest upgrades', 10, '#c090a8');
 
     STORE.forEach((item, i) => {
       const y = 150 + i * 82;
@@ -25,8 +25,8 @@ export default class Store extends Phaser.Scene {
       text(this, 30, y - 16, item.name, 15, '#ffffff', 0, 0.5);
       let gx = 30;
       for (const [cur, amount] of Object.entries(item.grants)) {
-        this.add.image(gx + 6, y + 12, cur === 'dna' ? 'dna' : 'coin').setScale(cur === 'dna' ? 2 : 2.6);
-        const t = text(this, gx + 18, y + 12, String(amount), 14, cur === 'dna' ? '#ff9be6' : '#ffd23f', 0, 0.5);
+        this.add.image(gx + 6, y + 12, cur === 'gems' ? 'gem' : 'coin').setScale(2.2);
+        const t = text(this, gx + 18, y + 12, String(amount), 14, cur === 'gems' ? '#ff9be6' : '#ffd23f', 0, 0.5);
         gx += 36 + t.width;
       }
       if (item.tag) text(this, 200, y - 16, item.tag, 10, '#ffd23f');

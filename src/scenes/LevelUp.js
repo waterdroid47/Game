@@ -20,7 +20,7 @@ export default class LevelUp extends Phaser.Scene {
     this.chosen = false;
     this.adBusy = false;
     // Ignore touches for a moment after the screen appears: the player's finger is usually
-    // still on the screen from steering the cell.
+    // still on the screen from steering the guard.
     this.readyAt = performance.now() + ARM_DELAY;
     this.add.rectangle(0, 0, W, H, 0x000000, 0.72).setOrigin(0).setInteractive();
     const chest = data.source === 'chest';
@@ -85,7 +85,7 @@ export default class LevelUp extends Phaser.Scene {
       c.add(face);
       c.setSize(328, ch).setInteractive({ useHandCursor: true });
       // A card is chosen only by a tap that starts on it, so lifting the finger that was
-      // moving the cell when this screen opened doesn't pick a card blindly.
+      // moving the guard when this screen opened doesn't pick a card blindly.
       c.on('pointerdown', (ptr) => {
         if (performance.now() < this.readyAt) return;
         c.pressedBy = ptr.id;

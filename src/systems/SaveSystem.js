@@ -1,9 +1,10 @@
 // Player progress, stored in localStorage. (On Android this can move to Capacitor Preferences.)
-const KEY = 'cell-defender-save-v1';
+const KEY = 'pixel-guard-save-v1';
+const OLD_KEY = 'cell-defender-save-v1'; // the game's old name; progress carries over
 
 const defaults = () => ({
   coins: 0,
-  dna: 0,
+  gems: 0,
   upgrades: {},
   unlocked: 1,
   stars: {},
@@ -16,10 +17,11 @@ const defaults = () => ({
 
 function load() {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(KEY) ?? localStorage.getItem(OLD_KEY);
     if (raw) {
       const d = defaults();
-      const saved = JSON.parse(raw);
+      const { dna, ...saved } = JSON.parse(raw);
+      if (saved.gems == null && dna != null) saved.gems = dna; // DNA was renamed to gems
       return { ...d, ...saved, settings: { ...d.settings, ...saved.settings }, stats: { ...d.stats, ...saved.stats } };
     }
   } catch (e) {

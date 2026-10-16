@@ -15,7 +15,7 @@ export default class Result extends Phaser.Scene {
     // Save rewards and progress.
     const d = Save.data;
     d.coins += r.coins;
-    d.dna += r.dna;
+    d.gems += r.gems;
     d.stats.runs += 1;
     d.stats.kills += r.kills;
     d.bestWave[r.level] = Math.max(d.bestWave[r.level] || 0, r.wave);
@@ -45,8 +45,8 @@ export default class Result extends Phaser.Scene {
     text(this, W - 60, 275, String(r.kills), 14, '#ffffff', 1);
     text(this, 60, 305, 'Coins earned', 14, '#e0c8d4', 0);
     const coinsT = text(this, W - 60, 305, String(r.coins), 14, '#ffd23f', 1);
-    text(this, 60, 335, 'DNA earned', 14, '#e0c8d4', 0);
-    text(this, W - 60, 335, String(r.dna), 14, '#ff9be6', 1);
+    text(this, 60, 335, 'Gems earned', 14, '#e0c8d4', 0);
+    text(this, W - 60, 335, String(r.gems), 14, '#ff9be6', 1);
 
     if (r.coins > 0) {
       const dbl = button(this, W / 2, 410, 250, 48, 'x2 COINS  (watch ad)', async () => {

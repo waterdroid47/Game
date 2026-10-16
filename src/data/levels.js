@@ -1,20 +1,21 @@
-// 10 levels. Each one is a body location with its own enemy mix and difficulty.
+// 10 levels. Each one is a place with its own monster mix, ground and difficulty.
 const NAMES = [
-  'Skin Scratch', 'Bloodstream', 'Lymph Node', 'Lungs', 'Stomach',
-  'Liver', 'Bone Marrow', 'Heart', 'Spinal Cord', 'Brain',
+  'Meadow', 'Dark Forest', 'Crystal Cave', 'Murky Swamp', 'Scorched Desert',
+  'Ice Peaks', 'Volcano', 'Graveyard', 'Castle Ruins', 'Dark Realm',
 ];
-// Background colours per level: [base, cells, cell rims].
+// Ground look per level: base colour, dark/light decoration shades, decoration type.
+// light is also used for the level's button on the level-select screen.
 const BACKGROUNDS = [
-  ['#2a0f14', '#3d1720', '#4a1c27'], // skin: dark rose
-  ['#30050a', '#4a0a13', '#5c0f19'], // bloodstream: deep red
-  ['#0b2415', '#123520', '#18422a'], // lymph node: green
-  ['#0a1930', '#112746', '#183356'], // lungs: blue
-  ['#2a2108', '#3d300d', '#4b3b12'], // stomach: amber
-  ['#2a1309', '#3c1d10', '#4b2616'], // liver: brown
-  ['#262320', '#38322c', '#463e36'], // bone marrow: bone grey
-  ['#3a0611', '#55091b', '#6a0e24'], // heart: crimson
-  ['#1b0e30', '#2a1746', '#351d56'], // spinal cord: violet
-  ['#30112a', '#461a3d', '#56214b'], // brain: pink
+  { base: '#1d3a1f', dark: '#16301a', light: '#2f5c2c', deco: 'grass' }, // meadow
+  { base: '#12251a', dark: '#0d1c13', light: '#214030', deco: 'leaves' }, // dark forest
+  { base: '#1b1a2e', dark: '#141325', light: '#3a3468', deco: 'crystals' }, // crystal cave
+  { base: '#1f2a19', dark: '#172013', light: '#3a4a24', deco: 'bubbles' }, // murky swamp
+  { base: '#3a2a14', dark: '#2e210f', light: '#5a4420', deco: 'sand' }, // scorched desert
+  { base: '#142236', dark: '#0f1a2a', light: '#2e4a70', deco: 'snow' }, // ice peaks
+  { base: '#2a0f0a', dark: '#200a07', light: '#6a2410', deco: 'lava' }, // volcano
+  { base: '#1e1a24', dark: '#16131b', light: '#3a3446', deco: 'bones' }, // graveyard
+  { base: '#22222a', dark: '#1a1a21', light: '#3c3c4a', deco: 'bricks' }, // castle ruins
+  { base: '#1a0d26', dark: '#12091b', light: '#4a2a70', deco: 'stars' }, // dark realm
 ];
 
 // How much tougher each level's enemies are (health): +12% per level. Shop upgrades only
@@ -23,15 +24,15 @@ const BACKGROUNDS = [
 // more waves, faster spawns, more enemy types and more damage.
 const HP_MULT = [1, 1.12, 1.24, 1.36, 1.48, 1.6, 1.7, 1.8, 1.9, 2.0];
 
-// Early levels: mostly basic viruses and slow tanks. Drifters (3 hits) from level 3,
-// fast germs (1 hit) from level 4.
+// Early levels: mostly slimes and slow golems. Ghosts (3 hits) from level 3,
+// fast bats (1 hit) and skeleton archers from level 4.
 function poolFor(n) {
-  if (n === 1) return { virus: 7, tank: 2 };
-  if (n === 2) return { virus: 7, tank: 3 };
-  if (n === 3) return { virus: 6, tank: 3, splitter: 2, drifter: 2 };
-  if (n <= 5) return { virus: 6, tank: 3, splitter: 2, drifter: 2, shooter: 2, germ: 2 };
-  if (n <= 7) return { virus: 5, tank: 3, splitter: 2, drifter: 3, shooter: 3, germ: 3 };
-  return { virus: 4, tank: 3, splitter: 3, drifter: 3, shooter: 3, germ: 4 };
+  if (n === 1) return { slime: 7, golem: 2 };
+  if (n === 2) return { slime: 7, golem: 3 };
+  if (n === 3) return { slime: 6, golem: 3, bigslime: 2, ghost: 2 };
+  if (n <= 5) return { slime: 6, golem: 3, bigslime: 2, ghost: 2, skeleton: 2, bat: 2 };
+  if (n <= 7) return { slime: 5, golem: 3, bigslime: 2, ghost: 3, skeleton: 3, bat: 3 };
+  return { slime: 4, golem: 3, bigslime: 3, ghost: 3, skeleton: 3, bat: 4 };
 }
 
 export const LEVELS = NAMES.map((name, i) => {
@@ -46,7 +47,7 @@ export const LEVELS = NAMES.map((name, i) => {
     dmgMult: 1 + 0.07 * i,
     pool: poolFor(n),
     clearCoins: 40 + 30 * n,
-    clearDna: n % 3 === 0 ? 10 : 3,
+    clearGems: n % 3 === 0 ? 10 : 3,
   };
 });
 

@@ -1,18 +1,18 @@
-# Cell Defender
+# Pixel Guard
 
-A mobile roguelike cell-defense shooter, built with [Phaser 3](https://phaser.io) and Vite.
+A pixel-art monster defense shooter for phones, built with [Phaser 3](https://phaser.io) and Vite.
 
-You are a cell guarding the body. Slide your finger to move: left and right, and up and down in the lower part of the screen to dodge the boss's attacks. You shoot automatically, and touching an enemy hurts. Waves of viruses, germs and bacteria get stronger every wave.
-- **Enemies:**
-  - viruses and slow tanks from level 1, and splitters from level 3;
-  - teal drifters from level 3: they sway slowly and always take 3 hits;
-  - fast yellow germs from level 4: they pop in one hit;
-  - shooters from level 4, plus elites and a boss in every level.
-- **Level-ups:** kill enemies to level up: twice in the first wave, then once per wave. Pick 1 of 3 upgrades. Each card shows exactly what changes, and maxed-out upgrades are never offered. These are stronger shots or new **attack stances**: Spread Shot, Enzyme Laser, Antibody Ring, Homing Phage and Immune Pulse. Each stance evolves at level 5.
-- **Bonus chests:** catch the ones that fall from elite enemies, or shoot them open, for extra upgrades.
+You are a little pixel guard holding the castle gate. Slide your finger to move: left and right, and up and down in the lower part of the screen to dodge the dragon's fireballs. You shoot automatically, and touching a monster hurts. Waves of monsters get stronger every wave.
+- **Monsters:**
+  - slimes and slow stone golems from level 1;
+  - big slimes that split, and ghosts that sway slowly and always take 3 hits, from level 3;
+  - fast bats that pop in one hit, and skeleton archers that shoot bones, from level 4;
+  - an Ogre King (drops a treasure chest) and the Red Dragon boss in every level.
+- **Level-ups:** kill monsters to level up: twice in the first wave, then once per wave. Pick 1 of 3 upgrades. Each card shows exactly what changes, and maxed-out upgrades are never offered. These are stronger bolts or new **attack stances**: Fire Fan, Lightning Beam, Shield Orbit, Spirit Missiles and Shockwave. Each stance evolves at level 5.
+- **Treasure chests:** catch the ones dropped by the Ogre King, or shoot them open, for extra upgrades.
 - **Rewarded ads:** watch one to revive, double your coins, or reroll the cards. Once per run, an ad can also **TAKE ALL** the cards on a bonus screen.
-- **10 levels**, each a part of the body with its own colours. Enemies get tougher with every wave and every level.
-- **Shop:** between runs, spend **coins** on permanent upgrades. **DNA**, from bosses, ads and the store, buys the strongest ones.
+- **10 levels:** Meadow, Dark Forest, Crystal Cave, Murky Swamp, Scorched Desert, Ice Peaks, Volcano, Graveyard, Castle Ruins and Dark Realm. Monsters get tougher with every wave and every level.
+- **Shop:** between runs, spend **coins** on permanent upgrades. **Gems**, from bosses, ads and the store, buy the strongest ones. Monsters adapt a little to your upgrades.
 
 ## Play / develop
 
@@ -38,22 +38,27 @@ Testing URL flags:
 src/
   main.js               Phaser config (360×640 portrait, scales to any phone)
   config.js             Screen size + URL flags
-  art/pixelSprites.js   All pixel art, drawn from text pixel maps (no image files needed)
+  art/palette.js        Shared 16-colour palette
+  art/sprites/          Pixel maps: hero (guard, bolts), items, monsters
+  art/pixelSprites.js   Turns the pixel maps into textures + animations; level grounds
   data/                 Balancing lives here – edit numbers, not code
     enemies.js          Enemy stats
     levels.js           10 levels, wave sizes, difficulty curve, XP curve
     upgrades.js         In-run upgrade cards and attack stances
-    shop.js             Permanent upgrades (coins / DNA)
+    shop.js             Permanent upgrades (coins / gems), monster adaptation
     store.js            Real-money packs (placeholders)
   scenes/               Boot, Menu, LevelSelect, Shop, Store, Game, LevelUp, Pause, Result
   systems/              WaveSpawner, SaveSystem (localStorage), Audio (synthesized SFX)
   services/monetization.js   Rewarded ads + in-app purchases (mocked in the browser)
 public/                 PWA manifest, service worker, icons
-scripts/make-icons.mjs  Regenerates the app icons from the cell sprite
+scripts/make-icons.mjs  Regenerates the app icons from the guard sprite
+scripts/preview-sprites.mjs  Renders/validates the pixel art
 ```
 
-### Replacing the art
-Every texture has a key (`cell`, `virus`, `boss`, `chest`, …). To use real art, load a PNG with the same key in `Boot.preload()` and remove that key from `pixelSprites.js`.
+### Pixel art
+All sprites are text pixel maps in `src/art/sprites/*.js`, one character per pixel, using the shared 16-colour palette in `src/art/palette.js` (see `_example.js`). Sprites with several frames are animated automatically.
+- Preview and validate them with `node scripts/preview-sprites.mjs out.png [group]`, which writes a scaled-up contact sheet.
+- To use real art instead, load a PNG with the same key (`guard`, `slime`, `dragon`, `chest`, …) in `Boot.preload()` and remove that sprite from its group file.
 
 ## Publishing
 
@@ -67,7 +72,7 @@ Every texture has a key (`cell`, `virus`, `boss`, `chest`, …). To use real art
 1. Add Capacitor:
    ```bash
    npm i @capacitor/core @capacitor/cli @capacitor/android
-   npx cap init "Cell Defender" com.yourname.celldefender --web-dir dist
+   npx cap init "Pixel Guard" com.waterdroid47.pixelguard --web-dir dist
    npx cap add android
    npm run build && npx cap sync && npx cap open android
    ```

@@ -20,7 +20,7 @@ export default class Shop extends Phaser.Scene {
     const rows = [];
     SHOP.forEach((item, i) => {
       const y = 126 + i * 57;
-      panel(this, 10, y - 25, W - 20, 50, 0x2a1220, item.currency === 'dna' ? 0x9b2c8c : 0x6b2b4a);
+      panel(this, 10, y - 25, W - 20, 50, 0x2a1220, item.currency === 'gems' ? 0x9b2c8c : 0x6b2b4a);
       this.add.image(32, y, item.icon).setScale(3).setTint(item.color);
       text(this, 54, y - 13, item.name, 13, '#ffffff', 0, 0.5);
       text(this, 54, y + 3, item.desc, 10, '#d0a0b8', 0, 0.5);
@@ -33,7 +33,7 @@ export default class Shop extends Phaser.Scene {
         Save.save();
         sfx.levelUp();
         update();
-      }, { size: 13, icon: item.currency === 'dna' ? 'dna' : 'coin', iconScale: item.currency === 'dna' ? 1.8 : 2.2 });
+      }, { size: 13, icon: item.currency === 'gems' ? 'gem' : 'coin', iconScale: 2 });
       rows.push({ item, b, pips, y });
     });
 
@@ -42,8 +42,8 @@ export default class Shop extends Phaser.Scene {
       const a = enemyAdapt();
       const pct = (x) => Math.round((x - 1) * 100);
       adaptText.setText(pct(a.hp) || pct(a.dmg)
-        ? `Enemies adapt: +${pct(a.hp)}% health, +${pct(a.dmg)}% damage`
-        : 'Permanent. Enemies adapt a little as you upgrade.');
+        ? `Monsters adapt: +${pct(a.hp)}% health, +${pct(a.dmg)}% damage`
+        : 'Permanent. Monsters adapt a little as you upgrade.');
       for (const { item, b, pips, y } of rows) {
         const lvl = Save.level(item.id);
         pips.clear();
