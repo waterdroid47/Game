@@ -40,8 +40,9 @@ export default class Store extends Phaser.Scene {
     const update = () => {
       STORE.forEach((item, i) => {
         const owned = item.oneTime && Save.data.purchases[item.id];
-        const label = owned ? 'OWNED' : Monetization.price(item);
-        buttons[i].setLabel(label).setEnabled(!owned);
+        const price = Monetization.price(item); // null while Google Play is not reachable
+        const label = owned ? 'OWNED' : price ?? '...';
+        buttons[i].setLabel(label).setEnabled(!owned && !!price);
         buttons[i].label.setFontSize(label.length > 8 ? 12 : 15); // long local prices, e.g. 9,99 lei
       });
       refresh();
@@ -50,7 +51,7 @@ export default class Store extends Phaser.Scene {
     const off = Monetization.onChange(update);
     this.events.once('shutdown', off);
 
-    text(this, W / 2, 540, 'Any purchase also removes the ads between levels', 10, '#c090a8');
+    text(this, W / 2, 542, 'Any purchase also removes the ads\nbetween levels on this phone', 10, '#c090a8');
     if (isNative()) {
       button(this, W / 2, 584, 200, 34, 'RESTORE PURCHASES', () => Monetization.restorePurchases(), { color: 0x444466, size: 12 });
     } else {

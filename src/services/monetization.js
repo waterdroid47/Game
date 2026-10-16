@@ -167,7 +167,8 @@ async function startSdk() {
     const s = ads.showing;
     if (!s || s.kind !== kind || s.closed) return;
     s.closed = true;
-    if (failed || s.earned || kind === 'interstitial') s.resolve(s.earned);
+    if (kind === 'interstitial') s.resolve(s.shown && !failed);
+    else if (failed || s.earned) s.resolve(s.earned);
     else setTimeout(() => s.resolve(s.earned), 600);
   };
   AdMob.addListener(R.Rewarded, () => {
@@ -203,8 +204,8 @@ function preload(kind) {
   return slot.promise;
 }
 
-// Opens a pre-loaded full-screen ad and resolves when it is closed.
-// Rewarded ads resolve true only if the reward was earned.
+// Opens a pre-loaded full-screen ad and resolves when it is closed: rewarded ads with
+// true only if the reward was earned, interstitials with true only if it was displayed.
 function present(kind) {
   ads[kind].state = 'idle';
   return new Promise((resolve) => {
@@ -246,13 +247,13 @@ const native = {
     return earned;
   },
   // Only shown if one is already loaded: the player is never kept waiting for it.
+  // Resolves true only if the ad was really displayed.
   async showInterstitial() {
     if (ads.interstitial.state !== 'ready') {
       preload('interstitial');
       return false;
     }
-    await present('interstitial');
-    return true;
+    return present('interstitial');
   },
   purchase: (id) => billingPurchase(id),
   restore: () => billingRestore(),
@@ -343,6 +344,7 @@ async function billingRestore() {
   return true;
 }
 
+let lastRefreshAt = 0;
 let adsReady = Promise.resolve();
 let billingReady = Promise.resolve();
 
@@ -380,9 +382,22 @@ export const Monetization = {
   },
   /** True while an ad or purchase screen is open. */
   busy: () => !!pending,
-  /** Localised price from Google Play, or the fallback price from store.js. */
+  /**
+   * The price to show: in the app the localised price from Google Play (null until it has
+   * loaded, e.g. offline), in the browser the test price from store.js.
+   */
   price(item) {
-    return C?.store.get(item.id, C.Platform.GOOGLE_PLAY)?.pricing?.price ?? item.price;
+    if (!isNative()) return item.price;
+    return C?.store.get(item.id, C.Platform.GOOGLE_PLAY)?.pricing?.price ?? null;
+  },
+  /**
+   * Asks Google Play again for purchases (called when the app comes back to the front), so a
+   * payment that was still pending, or was finished outside the app, is delivered right away.
+   */
+  refreshPurchases() {
+    if (!C || pending || Date.now() - lastRefreshAt < 60_000) return;
+    lastRefreshAt = Date.now();
+    C.store.restorePurchases().catch(() => {});
   },
   /** Count a finished level (win or lose) towards the next between-levels ad. */
   levelFinished() {

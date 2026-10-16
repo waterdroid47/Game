@@ -143,7 +143,9 @@ to other currencies) and **Activate** it:
 | `coins_sack` | Sack of Coins | 6000 coins | 2.99 |
 
 The ids can never be changed or reused, so check the spelling. The game treats `starter_pack` as one-time
-(restored after a reinstall) and the other packs as consumable (they can be bought again).
+(restored after a reinstall) and the other packs as consumable (they can be bought again). Any purchase
+removes the ads between levels on that phone; after a reinstall only the Starter Pack (and its ad removal)
+comes back, because Google Play doesn't keep a record of consumed packs.
 
 **Test purchases without paying:**
 1. **Settings → License testing**: add your Gmail (and your testers') → save.

@@ -8,6 +8,9 @@ export async function initNative(game) {
   const [{ App }, { StatusBar }] = await Promise.all([import('@capacitor/app'), import('@capacitor/status-bar')]);
   StatusBar.hide().catch(() => {});
 
+  // Back in the app: deliver any purchase that was completed meanwhile (pending payments).
+  App.addListener('resume', () => Monetization.refreshPurchases());
+
   // Back: pauses a run, closes the pause menu, goes back from menu screens to the main
   // menu, and leaves the app from the main menu.
   App.addListener('backButton', () => {
