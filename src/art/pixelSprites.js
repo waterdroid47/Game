@@ -111,7 +111,10 @@ export function createTextures(scene, levels = []) {
 // monsters doesn't move in lockstep.
 export function animate(sprite) {
   const key = `${sprite.texture.key}-anim`;
-  if (!sprite.scene.anims.exists(key)) return sprite;
+  if (!sprite.scene.anims.exists(key)) {
+    sprite.anims?.stop(); // a recycled sprite may still be playing its previous texture's animation
+    return sprite;
+  }
   const n = sprite.scene.anims.get(key).frames.length;
   sprite.play({ key, startFrame: Math.floor(Math.random() * n) });
   return sprite;

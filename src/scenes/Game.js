@@ -266,8 +266,8 @@ export default class Game extends Phaser.Scene {
         this.laserTick -= dt;
         const w = st.width;
         const flick = 0.75 + 0.25 * Math.sin(this.time.now * 0.08);
-        this.laserGfx.fillStyle(0xff4df0, 0.3 * flick).fillRect(px - w / 2 - 4, 0, w + 8, py);
-        this.laserGfx.fillStyle(0xff4df0, 0.75 * flick).fillRect(px - w / 2, 0, w, py);
+        this.laserGfx.fillStyle(STANCES.laser.color, 0.3 * flick).fillRect(px - w / 2 - 4, 0, w + 8, py);
+        this.laserGfx.fillStyle(STANCES.laser.color, 0.75 * flick).fillRect(px - w / 2, 0, w, py);
         this.laserGfx.fillStyle(0xffffff, 0.9).fillRect(px - w / 6, 0, w / 3, py);
         if (this.laserTick <= 0) {
           this.laserTick = 0.1;
@@ -358,7 +358,7 @@ export default class Game extends Phaser.Scene {
         for (const b of this.enemyBullets.getChildren()) {
           if (b.active && Phaser.Math.Distance.Between(px, pcy, b.x, b.y) < R) b.disableBody(true, true);
         }
-        const ring = this.add.circle(px, pcy, R, 0x7dff7a, 0.12).setStrokeStyle(4, 0x7dff7a, 0.9).setDepth(6).setScale(0.1);
+        const ring = this.add.circle(px, pcy, R, STANCES.pulse.color, 0.12).setStrokeStyle(4, STANCES.pulse.color, 0.9).setDepth(6).setScale(0.1);
         this.tweens.add({ targets: ring, scale: 1, alpha: 0, duration: 380, ease: 'Cubic.out', onComplete: () => ring.destroy() });
         sfx.pulse();
       }
@@ -626,6 +626,7 @@ export default class Game extends Phaser.Scene {
       if (!b) return;
       b.enableBody(true, e.x, e.y + 10, true, true);
       b.setScale(2).setDepth(6);
+      b.anims.stop(); // pooled shots are shared by skeletons (bones) and the dragon (fireballs)
       b.setTexture(sh.tex || 'bone');
       animate(b);
       const br = Math.min(b.width, b.height) * 0.35;
