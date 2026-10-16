@@ -8,8 +8,8 @@ export async function initNative(game) {
   const [{ App }, { StatusBar }] = await Promise.all([import('@capacitor/app'), import('@capacitor/status-bar')]);
   StatusBar.hide().catch(() => {});
 
-  // Back in the app: deliver any purchase that was completed meanwhile (pending payments).
-  App.addListener('resume', () => Monetization.refreshPurchases());
+  // Back in the app: deliver purchases completed meanwhile (pending payments), retry ads.
+  App.addListener('resume', () => Monetization.onResume());
 
   // Back: pauses a run, closes the pause menu, goes back from menu screens to the main
   // menu, and leaves the app from the main menu.
@@ -18,7 +18,7 @@ export async function initNative(game) {
     const top = game.scene.getScenes(true, true)[0]; // the scene in front
     switch (top?.scene.key) {
       case 'Menu': App.exitApp(); break;
-      case 'Game': top.pauseGame(); break;
+      case 'Game': top.pauseGame(); break; // nothing on the death menu: revive or give up
       case 'Pause': top.resumeGame(); break;
       case 'Result': top.leave('Menu'); break;
       case 'LevelUp': case 'Boot': case undefined: break; // a card must be picked

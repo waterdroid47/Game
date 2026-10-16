@@ -17,16 +17,22 @@ export const isNative = () => !!window.Capacitor?.isNativePlatform?.();
 // ---------------------------------------------------------------------------
 // small DOM helpers (drawn above the game canvas)
 // ---------------------------------------------------------------------------
-function overlay(html) {
+// A full-screen layer that swallows taps. Phaser listens for taps on the whole window, so
+// this stops taps from reaching the game objects underneath (e.g. a card behind an ad).
+function tapShield() {
   const el = document.createElement('div');
-  el.style.cssText = 'position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.85);font-family:"Courier New",monospace;color:#fff;';
-  el.innerHTML = `<div style="width:min(86vw,340px);background:#24101b;border:4px solid #000;box-shadow:0 0 0 4px #ff7aa8;padding:20px;text-align:center">${html}</div>`;
-  // Phaser listens for taps on the whole window, so stop taps on this overlay from
-  // reaching the game objects underneath (e.g. a card hidden behind the ad).
+  el.style.cssText = 'position:fixed;inset:0;z-index:1000;';
   for (const type of ['mousedown', 'mouseup', 'touchstart', 'touchend', 'pointerdown', 'pointerup']) {
     el.addEventListener(type, (e) => e.stopPropagation());
   }
   document.body.appendChild(el);
+  return el;
+}
+
+function overlay(html) {
+  const el = tapShield();
+  el.style.cssText += 'display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.85);font-family:"Courier New",monospace;color:#fff;';
+  el.innerHTML = `<div style="width:min(86vw,340px);background:#24101b;border:4px solid #000;box-shadow:0 0 0 4px #ff7aa8;padding:20px;text-align:center">${html}</div>`;
   return el;
 }
 
@@ -139,22 +145,46 @@ async function initAds() {
 
 async function updateConsent(showForm) {
   const { AdMob, AdmobConsentStatus, PrivacyOptionsRequirementStatus } = ads.module;
+  let info;
   try {
-    let info = await AdMob.requestConsentInfo();
-    if (showForm && info.isConsentFormAvailable && info.status === AdmobConsentStatus.REQUIRED) info = await AdMob.showConsentForm();
-    ads.canRequest = info.canRequestAds;
-    ads.privacyRequired = info.privacyOptionsRequirementStatus === PrivacyOptionsRequirementStatus.REQUIRED;
+    info = await AdMob.requestConsentInfo();
   } catch (e) {
+    // Offline etc.: fall back to this app's last answer. On the very first launch there is
+    // none, so no ads until consent could be asked (it is asked again on the next ad tap or
+    // when the app comes back to the front).
     console.warn('Consent info unavailable', e);
-    ads.canRequest = true; // offline etc.: the SDK still applies the consent saved earlier
+    ads.canRequest = !!Save.data.adConsent;
+    emit('ads');
+    return;
   }
+  if (showForm && info.isConsentFormAvailable && info.status === AdmobConsentStatus.REQUIRED) {
+    try {
+      info = await AdMob.showConsentForm();
+    } catch (e) {
+      console.warn('Consent form failed', e); // keep the answer from requestConsentInfo
+    }
+  }
+  ads.canRequest = info.canRequestAds;
+  ads.privacyRequired = info.privacyOptionsRequirementStatus === PrivacyOptionsRequirementStatus.REQUIRED;
+  Save.data.adConsent = info.canRequestAds;
+  Save.save();
   emit('ads');
 }
 
 function startAds() {
   if (!ads.canRequest) return Promise.resolve();
-  ads.starting ??= startSdk();
+  ads.starting ??= startSdk().catch((e) => {
+    ads.starting = null; // try again next time
+    throw e;
+  });
   return ads.starting;
+}
+
+// Starts ads now if that didn't work at launch (e.g. the consent check failed offline).
+async function ensureAds() {
+  if (!ads.module || ads.AdMob) return;
+  await updateConsent(true);
+  await startAds();
 }
 
 async function startSdk() {
@@ -177,6 +207,7 @@ async function startSdk() {
     s.earned = true;
     if (s.closed) s.resolve(true);
   });
+  AdMob.addListener(R.Showed, () => { if (ads.showing?.kind === 'rewarded') ads.showing.shown = true; });
   AdMob.addListener(R.Dismissed, () => close('rewarded'));
   AdMob.addListener(R.FailedToShow, () => close('rewarded', true));
   AdMob.addListener(I.Showed, () => { if (ads.showing?.kind === 'interstitial') ads.showing.shown = true; });
@@ -208,11 +239,14 @@ function preload(kind) {
 // true only if the reward was earned, interstitials with true only if it was displayed.
 function present(kind) {
   ads[kind].state = 'idle';
+  // The ad needs a moment to cover the game: block taps until it has closed again.
+  const shield = tapShield();
   return new Promise((resolve) => {
     const s = { kind, earned: false, closed: false, shown: false };
     s.resolve = (v) => {
       if (ads.showing !== s) return;
       ads.showing = null;
+      shield.remove();
       resolve(v);
       preload(kind); // get the next one ready
     };
@@ -221,8 +255,8 @@ function present(kind) {
       ? ads.AdMob.showRewardVideoAd({ adId: AD_UNITS[kind] }) // resolves only when rewarded
       : ads.AdMob.showInterstitial({ adId: AD_UNITS[kind] });
     show.catch(() => { s.closed = true; s.resolve(false); });
-    // An interstitial that never manages to open must not block the game.
-    if (kind === 'interstitial') setTimeout(() => { if (!s.shown && !s.closed) s.resolve(false); }, 8000);
+    // An ad that never manages to open must not block the game.
+    setTimeout(() => { if (!s.shown && !s.closed) s.resolve(false); }, 8000);
   });
 }
 
@@ -233,6 +267,7 @@ function loadingOverlay() {
 const native = {
   async showRewardedAd() {
     if (!ads.AdMob) await Promise.race([adsReady, sleep(6000)]);
+    if (!ads.AdMob) await Promise.race([ensureAds().catch(() => {}), sleep(15000)]);
     if (ads.rewarded.state !== 'ready') {
       const wait = loadingOverlay();
       const ok = await Promise.race([preload('rewarded'), sleep(8000, false)]);
@@ -319,7 +354,12 @@ async function billingPurchase(productId) {
   }
   const delivered = new Promise((r) => waiting.set(productId, r));
   try {
-    const err = await offer.order();
+    // Normally Google Play answers when its purchase sheet closes; never wait forever.
+    const err = await Promise.race([offer.order(), sleep(180000, { timeout: true })]);
+    if (err?.timeout) {
+      notice('Google Play is not responding. If you paid, your items will be added automatically.', 4000);
+      return false;
+    }
     if (err) {
       if (err.code !== C.ErrorCode.PAYMENT_CANCELLED) notice(`Purchase failed: ${err.message}`);
       return false;
@@ -339,12 +379,16 @@ async function billingRestore() {
     notice('The store is not available right now.');
     return false;
   }
-  await C.store.restorePurchases();
+  const answered = await Promise.race([C.store.restorePurchases().then(() => true), sleep(15000, false)]);
+  if (!answered) {
+    notice('Google Play is not responding. Try again later.');
+    return false;
+  }
   if (!syncOwned()) notice('Nothing to restore.');
   return true;
 }
 
-let lastRefreshAt = 0;
+let lastResumeAt = 0;
 let adsReady = Promise.resolve();
 let billingReady = Promise.resolve();
 
@@ -352,10 +396,13 @@ let billingReady = Promise.resolve();
 // public API
 // ---------------------------------------------------------------------------
 
-// Only one ad / purchase flow can be open at a time (guards against double taps).
+// Only one ad / purchase flow can be open at a time. Any other request while one is open
+// (a double tap, or another ad button) gets false straight away; it never shares the open
+// flow's result, so a reward can't be given twice or without its own ad.
 let pending = null;
 const once = (fn) => {
-  if (!pending) pending = fn().finally(() => { pending = null; });
+  if (pending) return Promise.resolve(false);
+  pending = fn().finally(() => { pending = null; });
   return pending;
 };
 
@@ -391,13 +438,15 @@ export const Monetization = {
     return C?.store.get(item.id, C.Platform.GOOGLE_PLAY)?.pricing?.price ?? null;
   },
   /**
-   * Asks Google Play again for purchases (called when the app comes back to the front), so a
-   * payment that was still pending, or was finished outside the app, is delivered right away.
+   * Called when the app comes back to the front (at most once a minute): asks Google Play
+   * again for purchases, so a payment that was still pending, or was finished outside the
+   * app, is delivered right away; and starts ads if that failed at launch.
    */
-  refreshPurchases() {
-    if (!C || pending || Date.now() - lastRefreshAt < 60_000) return;
-    lastRefreshAt = Date.now();
-    C.store.restorePurchases().catch(() => {});
+  onResume() {
+    if (!isNative() || pending || Date.now() - lastResumeAt < 60_000) return;
+    lastResumeAt = Date.now();
+    C?.store.restorePurchases().catch(() => {});
+    ensureAds().catch(() => {});
   },
   /** Count a finished level (win or lose) towards the next between-levels ad. */
   levelFinished() {

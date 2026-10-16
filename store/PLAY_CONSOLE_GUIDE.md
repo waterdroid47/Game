@@ -97,8 +97,8 @@ Start the questionnaire (IARC). Email: your support email. Category: **Game**.
 The expected result is about **PEGI 7 / ESRB Everyone 10+**.
 
 ### Data safety
-The game itself sends nothing to us: progress is saved only on the phone. The data below is collected by
-the **Google Mobile Ads SDK (AdMob)**.
+The game itself sends nothing to us: progress is saved on the phone (and in the player's own Android
+backup, if they have it turned on). The data below is collected by the **Google Mobile Ads SDK (AdMob)**.
 
 - Does your app collect or share any of the required user data types? **Yes**
 - Is all user data encrypted in transit? **Yes**
@@ -144,8 +144,9 @@ to other currencies) and **Activate** it:
 
 The ids can never be changed or reused, so check the spelling. The game treats `starter_pack` as one-time
 (restored after a reinstall) and the other packs as consumable (they can be bought again). Any purchase
-removes the ads between levels on that phone; after a reinstall only the Starter Pack (and its ad removal)
-comes back, because Google Play doesn't keep a record of consumed packs.
+removes the ads between levels on that phone. After a reinstall Google Play only restores the Starter Pack
+(and its ad removal), because it doesn't keep a record of consumed packs; Android's own backup, if the
+player has it on, may also bring back the whole save.
 
 **Test purchases without paying:**
 1. **Settings → License testing**: add your Gmail (and your testers') → save.
@@ -154,7 +155,8 @@ comes back, because Google Play doesn't keep a record of consumed packs.
 3. Check:
    - the gems/coins are added once;
    - buying the Starter Pack shows OWNED;
-   - after reinstalling the app, the Starter Pack comes back by itself (or with **RESTORE PURCHASES**);
+   - restoring: **Settings → Apps → Pixel Guard → Storage → Clear storage** (this skips Android's backup),
+     open the game: the Starter Pack comes back by itself (or with **RESTORE PURCHASES**);
    - after any purchase, the ads between levels stop.
 
 ## 6. AdMob: real ads
