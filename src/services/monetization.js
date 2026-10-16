@@ -158,8 +158,9 @@ function startAds() {
 }
 
 async function startSdk() {
-  const { AdMob, RewardAdPluginEvents: R, InterstitialAdPluginEvents: I } = ads.module;
-  await AdMob.initialize();
+  const { AdMob, MaxAdContentRating, RewardAdPluginEvents: R, InterstitialAdPluginEvents: I } = ads.module;
+  // A game for ages 13+: no ads above "parental guidance" content.
+  await AdMob.initialize({ maxAdContentRating: MaxAdContentRating.ParentalGuidance });
 
   // The reward can arrive just before or just after the ad is closed.
   const close = (kind, failed) => {
