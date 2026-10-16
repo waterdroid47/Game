@@ -75,7 +75,16 @@ export default class Menu extends Phaser.Scene {
       this.scene.restart();
     }, { size: 12, color: 0x663333 });
 
-    text(this, W / 2, H - 30, 'v0.1', 10, '#7a5060');
+    text(this, W / 2, H - 9, `v${__APP_VERSION__}`, 9, '#7a5060');
+
+    // Players in the EU can change their ad consent at any time (Android app only).
+    let privacy = null;
+    const updatePrivacy = () => {
+      if (privacy || !Monetization.privacyOptionsRequired()) return;
+      privacy = button(this, W / 2, H - 30, 96, 30, 'PRIVACY', () => Monetization.showPrivacyOptions(), { size: 12, color: 0x444466 });
+    };
+    updatePrivacy();
+    this.events.once('shutdown', Monetization.onChange(updatePrivacy));
   }
 
   update(_t, delta) {

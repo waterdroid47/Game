@@ -11,10 +11,7 @@ export default class Pause extends Phaser.Scene {
   create() {
     this.add.rectangle(0, 0, W, H, 0x000000, 0.75).setOrigin(0).setInteractive();
     text(this, W / 2, 200, 'PAUSED', 36, '#ffffff');
-    button(this, W / 2, 300, 220, 52, 'RESUME', () => {
-      this.scene.stop();
-      this.scene.resume('Game');
-    }, { size: 20 });
+    button(this, W / 2, 300, 220, 52, 'RESUME', () => this.resumeGame(), { size: 20 });
     const sound = button(this, W / 2, 370, 220, 42, '', () => {
       Save.data.settings.sound = !Save.data.settings.sound;
       Save.save();
@@ -26,5 +23,10 @@ export default class Pause extends Phaser.Scene {
       this.scene.start('Menu');
     }, { color: 0x663333 });
     text(this, W / 2, 480, 'Quitting loses this run\'s coins', 10, '#a08090');
+  }
+
+  resumeGame() {
+    this.scene.stop();
+    this.scene.resume('Game');
   }
 }

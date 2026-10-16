@@ -10,7 +10,7 @@ You are a little pixel guard holding the castle gate. Slide your finger to move:
   - an Ogre King (drops a treasure chest) and the Red Dragon boss in every level.
 - **Level-ups:** kill monsters to level up: twice in the first wave, then once per wave. Pick 1 of 3 upgrades. Each card shows exactly what changes, and maxed-out upgrades are never offered. These are stronger bolts or new **attack stances**: Fire Fan, Lightning Beam, Shield Orbit, Spirit Missiles and Shockwave. Each stance evolves at level 5.
 - **Treasure chests:** catch the ones dropped by the Ogre King, or shoot them open, for extra upgrades.
-- **Rewarded ads:** watch one to revive, double your coins, or reroll the cards. Once per run, an ad can also **TAKE ALL** the cards on a bonus screen.
+- **Rewarded ads:** watch one to revive, double your coins, or reroll the cards. Once per run, an ad can also **TAKE ALL** the cards on a bonus screen. In the Android app, a short skippable ad also plays between some levels; buying anything in the store removes it.
 - **10 levels:** Meadow, Dark Forest, Crystal Cave, Murky Swamp, Scorched Desert, Ice Peaks, Volcano, Graveyard, Castle Ruins and Dark Realm. Monsters get tougher with every wave and every level.
 - **Shop:** between runs, spend **coins** on permanent upgrades. **Gems**, from bosses, ads and the store, buy the strongest ones. Monsters adapt a little to your upgrades.
 
@@ -46,12 +46,16 @@ src/
     levels.js           10 levels, wave sizes, difficulty curve, XP curve
     upgrades.js         In-run upgrade cards and attack stances
     shop.js             Permanent upgrades (coins / gems), monster adaptation
-    store.js            Real-money packs (placeholders)
+    store.js            Real-money packs (Google Play product ids)
+    ads.js              AdMob ad unit ids, ads between levels
   scenes/               Boot, Menu, LevelSelect, Shop, Store, Game, LevelUp, Pause, Result
   systems/              WaveSpawner, SaveSystem (localStorage), Audio (synthesized SFX)
-  services/monetization.js   Rewarded ads + in-app purchases (mocked in the browser)
-public/                 PWA manifest, service worker, icons
-scripts/make-icons.mjs  Regenerates the app icons from the guard sprite
+  services/monetization.js   Ads + in-app purchases (AdMob / Google Play; mocked in the browser)
+  services/native.js    Android-only setup (Back button, status bar)
+public/                 PWA manifest, service worker, icons, privacy policy
+android/                Android app project (Capacitor)
+store/                  Google Play guide, store listing texts, graphics
+scripts/make-icons.mjs  Regenerates the web + Android icons from the guard sprite
 scripts/preview-sprites.mjs  Renders/validates the pixel art
 ```
 
@@ -68,18 +72,21 @@ All sprites are text pixel maps in `src/art/sprites/*.js`, one character per pix
 3. The site link is in the Netlify dashboard. You can rename it under **Site configuration → Change site name**.
 4. On your phone, open the link and choose "Add to Home screen" to install it.
 
-**Google Play (next step):** real ads and payments only work in a store app.
-1. Add Capacitor:
-   ```bash
-   npm i @capacitor/core @capacitor/cli @capacitor/android
-   npx cap init "Pixel Guard" com.waterdroid47.pixelguard --web-dir dist
-   npx cap add android
-   npm run build && npx cap sync && npx cap open android
-   ```
-2. Ads: install `@capacitor-community/admob` and create a rewarded ad unit in AdMob.
-3. Purchases: install `cordova-plugin-purchase` and create the products from `src/data/store.js` in the Play Console.
-4. Implement the `native` object in `src/services/monetization.js`. Nothing else in the game needs to change.
-5. Build a signed AAB in Android Studio and upload it to the Play Console. That needs:
-   - a developer account ($25 one-time)
-   - a privacy policy URL
-   - the ads declaration
+**Android / Google Play:** the Android app is a [Capacitor](https://capacitorjs.com) wrapper around the same game (the `android/` folder).
+- **Building:** GitHub Actions builds it automatically (`.github/workflows/android.yml`), so Android Studio isn't needed.
+  - Every push to `main` and every pull request produces a signed `.aab` (for Google Play) and an `.apk` (to install on a phone). They appear under **Artifacts** on the run's page.
+  - Signing uses the upload key stored in the repository secrets.
+- **Ads:** Google AdMob, via `@capacitor-community/admob`.
+  - Rewarded ads are optional and give rewards.
+  - A skippable ad appears between every 2nd or 3rd finished level; none after any purchase.
+  - EU players see the consent form first.
+  - Ad ids live in `src/data/ads.js`.
+- **Payments:** Google Play Billing, via `cordova-plugin-purchase`. Products are listed in `src/data/store.js`, and the code is in `src/services/monetization.js`.
+- **In the browser:** ads and payments are replaced by clearly labelled test dialogs.
+- **Publishing:** step-by-step Play Console instructions, store texts and graphics are in [`store/`](store/PLAY_CONSOLE_GUIDE.md). The privacy policy is `public/privacy.html`.
+
+To build it yourself instead, you need Android Studio, then:
+```bash
+npm run build && npx cap sync android && npx cap open android
+```
+`npm run icons` regenerates the web and Android icons from the guard sprite.
