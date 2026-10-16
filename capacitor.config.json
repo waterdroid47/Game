@@ -1,0 +1,11 @@
+{
+  "appId": "com.waterdroid47.pixelguard",
+  "appName": "Pixel Guard",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#12060d"
+  },
+  "plugins": {
+    "StatusBar": { "overlaysWebView": true }
+  }
+}

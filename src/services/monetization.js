@@ -1,18 +1,22 @@
 import { AUTOPLAY } from '../config.js';
+import { AD_UNITS, INTERSTITIAL, TEST_ADS } from '../data/ads.js';
 import { STORE } from '../data/store.js';
+import { Save } from '../systems/SaveSystem.js';
 
-// One interface for rewarded ads and in-app purchases.
+// One interface for ads and in-app purchases.
 //
-// - In the browser (and while developing) a MOCK is used: a fake 3-second ad and a
-//   confirmation dialog instead of payment. No real money is ever involved.
-// - In the Android app (Capacitor), replace `native` below with real calls to:
-//     * Google AdMob rewarded ads   -> @capacitor-community/admob
-//     * Google Play Billing          -> cordova-plugin-purchase (CdvPurchase)
-//   The rest of the game only calls Monetization.showRewardedAd() / purchase(), so
-//   nothing else needs to change.
+// - In the browser a MOCK is used: a fake 3-second ad and a confirmation dialog instead of
+//   payment. No real money is ever involved, and there are no ads between levels.
+// - In the Android app (Capacitor) the real thing is used:
+//     * Google AdMob rewarded + interstitial ads   -> @capacitor-community/admob
+//     * Google Play Billing                         -> cordova-plugin-purchase (CdvPurchase)
+// The rest of the game only calls the Monetization object at the bottom of this file.
 
-const isNative = () => !!window.Capacitor?.isNativePlatform?.();
+export const isNative = () => !!window.Capacitor?.isNativePlatform?.();
 
+// ---------------------------------------------------------------------------
+// small DOM helpers (drawn above the game canvas)
+// ---------------------------------------------------------------------------
 function overlay(html) {
   const el = document.createElement('div');
   el.style.cssText = 'position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.85);font-family:"Courier New",monospace;color:#fff;';
@@ -28,6 +32,44 @@ function overlay(html) {
 
 const btn = (id, label, bg) => `<button id="${id}" style="font:bold 16px 'Courier New',monospace;color:#fff;background:${bg};border:3px solid #000;padding:10px 14px;margin:6px;cursor:pointer">${label}</button>`;
 
+// A short message at the top of the screen that fades away by itself.
+export function notice(msg, ms = 2600) {
+  const el = document.createElement('div');
+  el.textContent = msg;
+  el.style.cssText = 'position:fixed;left:50%;top:12%;transform:translateX(-50%);z-index:1001;max-width:80vw;padding:10px 14px;background:#24101b;border:3px solid #000;box-shadow:0 0 0 3px #ff7aa8;color:#fff;font:bold 14px "Courier New",monospace;text-align:center;pointer-events:none;transition:opacity .4s';
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; }, ms);
+  setTimeout(() => el.remove(), ms + 500);
+}
+
+const sleep = (ms, value) => new Promise((r) => setTimeout(() => r(value), ms));
+
+// Scenes can listen for changes (prices loaded, purchase delivered, ...) to redraw.
+const listeners = new Set();
+const emit = (what) => listeners.forEach((fn) => fn(what));
+
+// Gives the player the contents of a store pack. Every purchase is granted exactly once:
+// by its transaction id, and one-time packs only once ever. Returns true if granted.
+export function deliver(productId, txId) {
+  const item = STORE.find((s) => s.id === productId);
+  if (!item) return false;
+  const d = Save.data;
+  if (txId && d.txns.includes(txId)) return false;
+  if (txId) d.txns = [...d.txns, txId].slice(-100);
+  d.adsRemoved = true;
+  const fresh = !(item.oneTime && d.purchases[item.id]);
+  if (fresh) {
+    for (const [cur, amount] of Object.entries(item.grants)) d[cur] += amount;
+    if (item.oneTime) d.purchases[item.id] = true;
+  }
+  Save.save();
+  emit('delivered');
+  return fresh;
+}
+
+// ---------------------------------------------------------------------------
+// MOCK (browser)
+// ---------------------------------------------------------------------------
 const mock = {
   showRewardedAd(placement) {
     if (AUTOPLAY) return Promise.resolve(true);
@@ -50,6 +92,7 @@ const mock = {
       el.querySelector('#ad-close').onclick = () => { clearInterval(timer); el.remove(); resolve(false); };
     });
   },
+  showInterstitial: () => Promise.resolve(false), // no ads between levels in the browser
   purchase(productId) {
     const item = STORE.find((s) => s.id === productId);
     return new Promise((resolve) => {
@@ -58,17 +101,253 @@ const mock = {
         <div style="font-size:20px;font-weight:bold;margin:16px 0">${item?.name ?? productId}</div>
         <div style="font-size:24px;color:#ffd23f;margin-bottom:12px">${item?.price ?? ''}</div>
         ${btn('p-buy', 'Buy', '#2e9e5b')}${btn('p-cancel', 'Cancel', '#555')}`);
-      el.querySelector('#p-buy').onclick = () => { el.remove(); resolve(true); };
+      el.querySelector('#p-buy').onclick = () => {
+        el.remove();
+        deliver(productId, `test-${Date.now()}`);
+        resolve(true);
+      };
       el.querySelector('#p-cancel').onclick = () => { el.remove(); resolve(false); };
     });
   },
+  restore: () => Promise.resolve(false),
 };
 
-// Placeholder for the Android implementation (Phase 6). Falls back to the mock until wired up.
-const native = {
-  showRewardedAd: (placement) => mock.showRewardedAd(placement),
-  purchase: (id) => mock.purchase(id),
+// ---------------------------------------------------------------------------
+// NATIVE ADS (AdMob)
+// ---------------------------------------------------------------------------
+const ads = {
+  module: null, // @capacitor-community/admob
+  plugin: null, // the AdMob plugin (for the consent forms)
+  starting: null,
+  AdMob: null, // set once the ads SDK has started
+  canRequest: false,
+  privacyRequired: false,
+  rewarded: { state: 'idle', promise: null }, // idle | loading | ready
+  interstitial: { state: 'idle', promise: null },
+  showing: null, // the full-screen ad currently open: { kind, earned, closed, resolve }
 };
+
+// Consent first (Google's UMP form, shown only where the law requires it, e.g. the EU),
+// then the ads SDK starts and pre-loads ads so they open instantly when needed.
+async function initAds() {
+  const m = await import('@capacitor-community/admob');
+  ads.module = m;
+  ads.plugin = m.AdMob;
+  await updateConsent(true);
+  await startAds();
+}
+
+async function updateConsent(showForm) {
+  const { AdMob, AdmobConsentStatus, PrivacyOptionsRequirementStatus } = ads.module;
+  try {
+    let info = await AdMob.requestConsentInfo();
+    if (showForm && info.isConsentFormAvailable && info.status === AdmobConsentStatus.REQUIRED) info = await AdMob.showConsentForm();
+    ads.canRequest = info.canRequestAds;
+    ads.privacyRequired = info.privacyOptionsRequirementStatus === PrivacyOptionsRequirementStatus.REQUIRED;
+  } catch (e) {
+    console.warn('Consent info unavailable', e);
+    ads.canRequest = true; // offline etc.: the SDK still applies the consent saved earlier
+  }
+  emit('ads');
+}
+
+function startAds() {
+  if (!ads.canRequest) return Promise.resolve();
+  ads.starting ??= startSdk();
+  return ads.starting;
+}
+
+async function startSdk() {
+  const { AdMob, RewardAdPluginEvents: R, InterstitialAdPluginEvents: I } = ads.module;
+  await AdMob.initialize();
+
+  // The reward can arrive just before or just after the ad is closed.
+  const close = (kind, failed) => {
+    const s = ads.showing;
+    if (!s || s.kind !== kind || s.closed) return;
+    s.closed = true;
+    if (failed || s.earned || kind === 'interstitial') s.resolve(s.earned);
+    else setTimeout(() => s.resolve(s.earned), 600);
+  };
+  AdMob.addListener(R.Rewarded, () => {
+    const s = ads.showing;
+    if (!s || s.kind !== 'rewarded') return;
+    s.earned = true;
+    if (s.closed) s.resolve(true);
+  });
+  AdMob.addListener(R.Dismissed, () => close('rewarded'));
+  AdMob.addListener(R.FailedToShow, () => close('rewarded', true));
+  AdMob.addListener(I.Showed, () => { if (ads.showing?.kind === 'interstitial') ads.showing.shown = true; });
+  AdMob.addListener(I.Dismissed, () => close('interstitial'));
+  AdMob.addListener(I.FailedToShow, () => close('interstitial', true));
+
+  ads.AdMob = AdMob;
+  emit('ads');
+  preload('rewarded');
+  if (!Save.data.adsRemoved) preload('interstitial');
+}
+
+function preload(kind) {
+  const slot = ads[kind];
+  if (!ads.AdMob || !ads.canRequest) return Promise.resolve(false);
+  if (slot.state === 'ready') return Promise.resolve(true);
+  if (slot.state === 'loading') return slot.promise;
+  slot.state = 'loading';
+  const opts = { adId: AD_UNITS[kind], isTesting: TEST_ADS, immersiveMode: true };
+  const load = kind === 'rewarded' ? ads.AdMob.prepareRewardVideoAd(opts) : ads.AdMob.prepareInterstitial(opts);
+  slot.promise = load.then(
+    () => { slot.state = 'ready'; return true; },
+    (e) => { slot.state = 'idle'; console.warn(`${kind} ad failed to load`, e); return false; },
+  );
+  return slot.promise;
+}
+
+// Opens a pre-loaded full-screen ad and resolves when it is closed.
+// Rewarded ads resolve true only if the reward was earned.
+function present(kind) {
+  ads[kind].state = 'idle';
+  return new Promise((resolve) => {
+    const s = { kind, earned: false, closed: false, shown: false };
+    s.resolve = (v) => {
+      if (ads.showing !== s) return;
+      ads.showing = null;
+      resolve(v);
+      preload(kind); // get the next one ready
+    };
+    ads.showing = s;
+    const show = kind === 'rewarded'
+      ? ads.AdMob.showRewardVideoAd({ adId: AD_UNITS[kind] }) // resolves only when rewarded
+      : ads.AdMob.showInterstitial({ adId: AD_UNITS[kind] });
+    show.catch(() => { s.closed = true; s.resolve(false); });
+    // An interstitial that never manages to open must not block the game.
+    if (kind === 'interstitial') setTimeout(() => { if (!s.shown && !s.closed) s.resolve(false); }, 8000);
+  });
+}
+
+function loadingOverlay() {
+  return overlay('<div style="font-size:18px;font-weight:bold">Loading ad...</div>');
+}
+
+const native = {
+  async showRewardedAd() {
+    if (!ads.AdMob) await Promise.race([adsReady, sleep(6000)]);
+    if (ads.rewarded.state !== 'ready') {
+      const wait = loadingOverlay();
+      const ok = await Promise.race([preload('rewarded'), sleep(8000, false)]);
+      wait.remove();
+      if (!ok || ads.rewarded.state !== 'ready') {
+        notice('No ad available right now. Try again later.');
+        return false;
+      }
+    }
+    const earned = await present('rewarded');
+    if (earned) lastRewardedAt = Date.now();
+    return earned;
+  },
+  // Only shown if one is already loaded: the player is never kept waiting for it.
+  async showInterstitial() {
+    if (ads.interstitial.state !== 'ready') {
+      preload('interstitial');
+      return false;
+    }
+    await present('interstitial');
+    return true;
+  },
+  purchase: (id) => billingPurchase(id),
+  restore: () => billingRestore(),
+};
+let lastRewardedAt = 0;
+
+// ---------------------------------------------------------------------------
+// NATIVE PAYMENTS (Google Play Billing through CdvPurchase)
+// ---------------------------------------------------------------------------
+let C = null; // window.CdvPurchase, once the store is ready
+const waiting = new Map(); // productId -> resolve(true) when that purchase is delivered
+
+async function initBilling() {
+  // Cordova plugins appear on window after 'deviceready'.
+  for (let i = 0; i < 100 && !window.CdvPurchase; i++) await sleep(100);
+  const P = window.CdvPurchase;
+  if (!P) throw new Error('CdvPurchase not available');
+  const { store, ProductType, Platform, LogLevel } = P;
+  store.verbosity = LogLevel.WARNING;
+  store.register(STORE.map((s) => ({
+    id: s.id,
+    type: s.oneTime ? ProductType.NON_CONSUMABLE : ProductType.CONSUMABLE,
+    platform: Platform.GOOGLE_PLAY,
+  })));
+  store.when()
+    .productUpdated(() => emit('prices'))
+    .approved((tx) => {
+      // Paid: give the items (once), then tell Google Play it was delivered.
+      // Consumable packs are consumed by finish(), so they can be bought again.
+      for (const p of tx.products) {
+        if (deliver(p.id, tx.transactionId) && !waiting.has(p.id)) notice('Purchase complete! Your items were added.');
+        waiting.get(p.id)?.(true);
+      }
+      tx.finish();
+    })
+    .receiptUpdated(() => syncOwned());
+  await store.initialize([Platform.GOOGLE_PLAY]);
+  C = P;
+  syncOwned();
+  emit('prices');
+}
+
+// One-time packs bought earlier (e.g. before reinstalling the app) come back.
+function syncOwned() {
+  if (!window.CdvPurchase) return false;
+  let restored = false;
+  for (const item of STORE) {
+    if (item.oneTime && !Save.data.purchases[item.id] && !waiting.has(item.id) && window.CdvPurchase.store.owned(item.id)) {
+      deliver(item.id, null);
+      restored = true;
+    }
+  }
+  if (restored) notice('Your purchases were restored.');
+  return restored;
+}
+
+async function billingPurchase(productId) {
+  if (!C) await Promise.race([billingReady, sleep(5000)]);
+  const offer = C?.store.get(productId, C.Platform.GOOGLE_PLAY)?.getOffer();
+  if (!offer) {
+    notice('The store is not available right now. Check your connection and try again.');
+    return false;
+  }
+  const delivered = new Promise((r) => waiting.set(productId, r));
+  try {
+    const err = await offer.order();
+    if (err) {
+      if (err.code !== C.ErrorCode.PAYMENT_CANCELLED) notice(`Purchase failed: ${err.message}`);
+      return false;
+    }
+    // Paid: wait for Google Play to confirm it (the 'approved' event above).
+    const ok = await Promise.race([delivered, sleep(20000, false)]);
+    if (!ok) notice('Payment pending. Your items will be added as soon as Google Play confirms it.', 4000);
+    return ok;
+  } finally {
+    waiting.delete(productId);
+  }
+}
+
+async function billingRestore() {
+  if (!C) await Promise.race([billingReady, sleep(5000)]);
+  if (!C) {
+    notice('The store is not available right now.');
+    return false;
+  }
+  await C.store.restorePurchases();
+  if (!syncOwned()) notice('Nothing to restore.');
+  return true;
+}
+
+let adsReady = Promise.resolve();
+let billingReady = Promise.resolve();
+
+// ---------------------------------------------------------------------------
+// public API
+// ---------------------------------------------------------------------------
 
 // Only one ad / purchase flow can be open at a time (guards against double taps).
 let pending = null;
@@ -77,13 +356,67 @@ const once = (fn) => {
   return pending;
 };
 
+const impl = () => (isNative() ? native : mock);
+
 export const Monetization = {
+  /** Called once at start-up (Android only): consent, ads and the store. */
+  init() {
+    if (!isNative()) return;
+    adsReady = initAds().catch((e) => console.warn('Ads unavailable', e));
+    billingReady = initBilling().catch((e) => console.warn('Store unavailable', e));
+  },
   /** Shows a rewarded ad. Resolves true only if the player watched it to the end. */
   showRewardedAd(placement = 'reward') {
-    return once(() => (isNative() ? native : mock).showRewardedAd(placement));
+    return once(() => impl().showRewardedAd(placement));
   },
-  /** Starts a purchase of a STORE product id. Resolves true if paid. */
+  /** Starts a purchase of a STORE product id. Resolves true once its items were added. */
   purchase(productId) {
-    return once(() => (isNative() ? native : mock).purchase(productId));
+    return once(() => impl().purchase(productId));
+  },
+  /** Brings back one-time packs bought before (e.g. on a new phone). */
+  restorePurchases() {
+    return once(() => impl().restore());
+  },
+  /** True while an ad or purchase screen is open. */
+  busy: () => !!pending,
+  /** Localised price from Google Play, or the fallback price from store.js. */
+  price(item) {
+    return C?.store.get(item.id, C.Platform.GOOGLE_PLAY)?.pricing?.price ?? item.price;
+  },
+  /** Count a finished level (win or lose) towards the next between-levels ad. */
+  levelFinished() {
+    Save.data.inter.since += 1;
+    Save.save();
+  },
+  /**
+   * Called when the player leaves the result screen. Every 2nd or 3rd finished level it
+   * shows a skippable interstitial ad, unless the player bought anything, has just
+   * watched a rewarded ad, or no ad is loaded. Resolves when the game can continue.
+   */
+  async betweenLevels() {
+    const inter = Save.data.inter;
+    if (!isNative() || Save.data.adsRemoved || pending || inter.since < inter.every) return;
+    if (Date.now() - lastRewardedAt < INTERSTITIAL.skipAfterRewardedMs) return;
+    if (!(await once(() => impl().showInterstitial()))) return;
+    const { everyMin: a, everyMax: b } = INTERSTITIAL;
+    Save.data.inter = { since: 0, every: a + Math.floor(Math.random() * (b - a + 1)) };
+    Save.save();
+  },
+  /** EU players must be able to change their ad consent: show a button when needed. */
+  privacyOptionsRequired: () => ads.privacyRequired,
+  async showPrivacyOptions() {
+    if (!ads.plugin) return;
+    try {
+      await ads.plugin.showPrivacyOptionsForm();
+      await updateConsent(false);
+      await startAds();
+    } catch (e) {
+      console.warn('Privacy options unavailable', e);
+    }
+  },
+  /** Listen for 'prices' / 'delivered' / 'ads'. Returns a function that stops listening. */
+  onChange(fn) {
+    listeners.add(fn);
+    return () => listeners.delete(fn);
   },
 };

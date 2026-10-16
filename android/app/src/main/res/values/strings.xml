@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Pixel Guard</string>
+    <string name="title_activity_main">Pixel Guard</string>
+    <string name="package_name">com.waterdroid47.pixelguard</string>
+    <string name="custom_url_scheme">com.waterdroid47.pixelguard</string>
+    <!-- AdMob app id. This is Google's official TEST id: replace it with the real one from AdMob. -->
+    <string name="admob_app_id">ca-app-pub-3940256099942544~3347511713</string>
+</resources>
