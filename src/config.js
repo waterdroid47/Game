@@ -4,8 +4,8 @@ export const H = 640;
 
 export const PLAYER_Y = 560; // lowest (starting) position of the player
 export const MOVE_TOP = 330; // the player can move up to here
-export const MEMBRANE_Y = 592;
-export const SPRITE_SCALE = 3;
+export const WALL_Y = 592; // top of the castle wall: monsters that get here hurt the guard
+export const SPRITE_SCALE = 2; // every sprite pixel is drawn as 2x2 screen pixels
 
 export const FONT = '"Courier New", Courier, monospace';
 

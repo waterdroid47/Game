@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { W } from '../config.js';
+import { BOSS } from '../data/enemies.js';
 import { waveSpec } from '../data/levels.js';
 
 // Spawns the enemies of each wave and moves on to the next wave when the screen is clear.
@@ -26,7 +27,7 @@ export default class WaveSpawner {
     this.isBoss = this.wave === L.waves;
     this.queue = [];
     if (this.isBoss) {
-      this.queue.push('boss');
+      this.queue.push(BOSS);
       for (let i = 0; i < 6 + L.n; i++) this.queue.push(this.pick());
       this.interval = this.spec.interval * 2.2;
     } else {
@@ -59,7 +60,7 @@ export default class WaveSpawner {
       this.timer -= dt;
       if (this.timer <= 0 && this.queue.length) {
         const type = this.queue.shift();
-        const boss = type === 'boss';
+        const boss = type === BOSS;
         this.game.spawnEnemy(type, boss ? W / 2 : Phaser.Math.Between(24, W - 24), boss ? -40 : -16, this.spec.hpMult);
         this.timer = this.interval * Phaser.Math.FloatBetween(0.6, 1.4);
       }
@@ -77,6 +78,6 @@ export default class WaveSpawner {
 
   // Debug helper: drop the rest of this wave.
   skip() {
-    this.queue = this.queue.filter((t) => t === 'boss');
+    this.queue = this.queue.filter((t) => t === BOSS);
   }
 }

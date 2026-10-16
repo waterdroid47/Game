@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
-import { AUTOPLAY, DEBUG, H, MEMBRANE_Y, MOVE_TOP, PLAYER_Y, SPEED, SPRITE_SCALE, W } from '../config.js';
+import { AUTOPLAY, DEBUG, H, WALL_Y, MOVE_TOP, PLAYER_Y, SPEED, SPRITE_SCALE, W } from '../config.js';
 import { ENEMIES } from '../data/enemies.js';
 import { LEVELS, LEVEL_UPS } from '../data/levels.js';
 import { enemyAdapt, metaStats } from '../data/shop.js';
 import { CARDS, STANCES, STANCE_MAX, STANCE_STATS, canTake, rollCards } from '../data/upgrades.js';
 import { Monetization } from '../services/monetization.js';
 import { sfx } from '../systems/Audio.js';
+import { animate } from '../art/pixelSprites.js';
 import WaveSpawner from '../systems/WaveSpawner.js';
 import { button, text } from '../ui/widgets.js';
 
@@ -17,9 +18,10 @@ const xpOf = (type) => {
   const d = ENEMIES[type];
   return d.xp + (d.split ? d.split.count * xpOf(d.split.into) : 0);
 };
+// Burst colour when a monster is defeated.
 const ENEMY_COLORS = {
-  virus: 0xe0335a, germ: 0xffd23f, tank: 0x7fae3a, splitter: 0x4aa8ff, mini: 0x4aa8ff,
-  shooter: 0xff8a2a, elite: 0xc43cf0, boss: 0x56b53a, drifter: 0x3fd1a8,
+  slime: 0x00e436, bat: 0x7e2553, golem: 0xc2c3c7, bigslime: 0x83769c, minislime: 0x83769c,
+  skeleton: 0xfff1e8, ogre: 0x008751, dragon: 0xff004d, ghost: 0xfff1e8,
 };
 
 export default class Game extends Phaser.Scene {
@@ -37,8 +39,9 @@ export default class Game extends Phaser.Scene {
     this.physics.world.timeScale = 1 / SPEED;
 
     this.bg = this.add.tileSprite(0, 0, W, H, `bg_${this.level.n}`).setOrigin(0);
-    this.add.tileSprite(0, MEMBRANE_Y, W, 18, 'membrane').setOrigin(0, 0).setTileScale(3, 3).setDepth(2);
-    this.add.rectangle(0, MEMBRANE_Y + 18, W, H - MEMBRANE_Y - 18, 0x3a0d20).setOrigin(0).setDepth(2);
+    // The castle wall the guard defends (monsters that reach it hurt the guard).
+    this.add.tileSprite(0, WALL_Y - 4, W, 24, 'wall').setOrigin(0, 0).setTileScale(2, 2).setDepth(2);
+    this.add.rectangle(0, WALL_Y + 20, W, H - WALL_Y - 20, 0x2b2733).setOrigin(0).setDepth(2);
 
     // ----- run state -----
     const meta = (this.meta = metaStats());
@@ -92,8 +95,9 @@ export default class Game extends Phaser.Scene {
     this.pickups = this.physics.add.group();
 
     // ----- player -----
-    this.player = this.physics.add.sprite(W / 2, PLAYER_Y, 'cell').setScale(SPRITE_SCALE).setDepth(7);
-    this.player.body.setCircle(5, 1, 1);
+    this.player = animate(this.physics.add.sprite(W / 2, PLAYER_Y, 'guard').setScale(SPRITE_SCALE).setDepth(7));
+    const pr = 15 / SPRITE_SCALE; // 15px hit radius
+    this.player.body.setCircle(pr, this.player.width / 2 - pr, this.player.height / 2 - pr);
     this.targetX = W / 2;
     this.targetY = PLAYER_Y;
     this.tweens.add({ targets: this.player, scaleX: SPRITE_SCALE * 1.06, scaleY: SPRITE_SCALE * 0.94, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
@@ -320,10 +324,10 @@ export default class Game extends Phaser.Scene {
         const n = st.count;
         const spacing = n > 4 ? 24 : 35;
         for (let i = 0; i < n; i++) {
-          const m = this.missiles.get(px, py, 'missile');
+          const m = this.missiles.get(px, py, 'spirit');
           if (!m) break;
           m.enableBody(true, px, py, true, true);
-          m.setScale(evolved ? 3 : 2.4).setDepth(6);
+          animate(m.setScale(evolved ? 2.6 : 2).setDepth(6));
           m.heading = (-90 + (i - (n - 1) / 2) * spacing) * (Math.PI / 180);
           m.target = null;
           m.life = 4;
@@ -362,7 +366,7 @@ export default class Game extends Phaser.Scene {
   }
 
   fireBullet(x, y, angleDeg, damage, opts = {}) {
-    const b = this.bullets.get(x, y, 'bullet');
+    const b = this.bullets.get(x, y, 'bolt');
     if (!b) return;
     b.enableBody(true, x, y, true, true);
     b.setScale(2 * this.stats.bulletScale * (opts.scale || 1)).setDepth(6);
@@ -380,7 +384,7 @@ export default class Game extends Phaser.Scene {
     this.orbiters.forEach((o) => o.destroy());
     const n = STANCE_STATS.orbit(this.stances.orbit).count;
     this.orbiters = [];
-    for (let i = 0; i < n; i++) this.orbiters.push(this.add.image(this.player.x, this.player.y, 'orbiter').setScale(2.6).setDepth(7));
+    for (let i = 0; i < n; i++) this.orbiters.push(this.add.image(this.player.x, this.player.y, 'shield').setScale(2).setDepth(7));
   }
 
   // ======================================================================
@@ -439,7 +443,7 @@ export default class Game extends Phaser.Scene {
       }
     }
     for (const c of this.pickups.getChildren()) {
-      if (c.active && c.y > MEMBRANE_Y + 12) {
+      if (c.active && c.y > WALL_Y + 12) {
         this.tweens.add({ targets: c, alpha: 0, duration: 200, onComplete: () => c.destroy() });
         c.body.enable = false;
         c.setActive(false);
@@ -448,7 +452,7 @@ export default class Game extends Phaser.Scene {
   }
 
   dropChest(x, y, rare) {
-    const c = this.pickups.create(x, y, rare ? 'chestRare' : 'chest').setScale(3).setDepth(6);
+    const c = this.pickups.create(x, y, rare ? 'chestRare' : 'chest').setScale(2.5).setDepth(6);
     c.rare = rare;
     // Chests can be caught, or shot open: about 4 main shots (6 for a rare chest).
     c.maxHp = c.hp = this.stats.damage * (rare ? 6 : 4);
@@ -508,14 +512,10 @@ export default class Game extends Phaser.Scene {
   // ======================================================================
   spawnEnemy(type, x, y, hpMult) {
     const def = ENEMIES[type];
-    const e = this.physics.add.sprite(x, y, def.tex).setScale(def.scale ?? SPRITE_SCALE).setDepth(5);
+    const e = animate(this.physics.add.sprite(x, y, def.tex).setScale(SPRITE_SCALE).setDepth(5));
     this.enemies.add(e);
-    if (def.wideBody) {
-      e.body.setSize(e.width * 0.9, e.height * 0.8);
-    } else {
-      const r = Math.min(e.width, e.height) * 0.45;
-      e.body.setCircle(r, e.width / 2 - r, e.height / 2 - r);
-    }
+    const r = def.radius / SPRITE_SCALE; // hitbox from the data, not the picture
+    e.body.setCircle(r, e.width / 2 - r, e.height / 2 - r);
     e.def = def;
     e.type = type;
     // def.hits: dies after that many hits, whatever the damage.
@@ -607,9 +607,9 @@ export default class Game extends Phaser.Scene {
           }
         }
       }
-      if (e.y >= MEMBRANE_Y - 6) {
+      if (e.y >= WALL_Y - 6) {
         this.hurtPlayer(this.enemyDamage(def.dmg));
-        this.burst(e.x, MEMBRANE_Y, 0xff7aa8, 12);
+        this.burst(e.x, WALL_Y, 0xff7aa8, 12);
         this.removeEnemy(e);
       }
     }
@@ -622,11 +622,14 @@ export default class Game extends Phaser.Scene {
     const spread = ((sh.spread || 0) * Math.PI) / 180;
     for (let i = 0; i < n; i++) {
       const a = n > 1 ? base - spread / 2 + (spread * i) / (n - 1) : base;
-      const b = this.enemyBullets.get(e.x, e.y + 10, 'ebullet');
+      const b = this.enemyBullets.get(e.x, e.y + 10, sh.tex || 'bone');
       if (!b) return;
       b.enableBody(true, e.x, e.y + 10, true, true);
-      b.setScale(2.4).setDepth(6);
-      b.body.setCircle(2, 0.5, 0.5);
+      b.setScale(2).setDepth(6);
+      b.setTexture(sh.tex || 'bone');
+      animate(b);
+      const br = Math.min(b.width, b.height) * 0.35;
+      b.body.setCircle(br, b.width / 2 - br, b.height / 2 - br);
       this.physics.velocityFromRotation(a, sh.speed, b.body.velocity);
       b.damage = this.enemyShotDamage(sh.dmg);
     }
@@ -702,7 +705,7 @@ export default class Game extends Phaser.Scene {
     }
   }
 
-  // Remove without reward (reached the membrane, revive clean-up, or killed).
+  // Remove without reward (reached the wall, revive clean-up, or killed).
   removeEnemy(e) {
     e.dying = true;
     e.setActive(false).setVisible(false);
@@ -714,7 +717,7 @@ export default class Game extends Phaser.Scene {
   // ======================================================================
   // player health / xp / level-ups
   // ======================================================================
-  // Touching an enemy hurts: it bursts on the membrane of the cell (the boss just hurts).
+  // Touching a monster hurts: it bursts against the guard's armour (the boss just hurts).
   onPlayerTouchEnemy(_p, e) {
     if (!e.active || e.dying || this.invuln > 0 || this.dead || this.finished) return;
     const dmg = this.enemyDamage(e.def.dmg);
@@ -828,7 +831,7 @@ export default class Game extends Phaser.Scene {
     }
     const c = this.add.container(0, 0).setDepth(50);
     c.add(this.add.rectangle(0, 0, W, H, 0x000000, 0.75).setOrigin(0).setInteractive());
-    c.add(text(this, W / 2, 210, 'YOUR CELL\nWAS INFECTED', 28, '#ff4d6d'));
+    c.add(text(this, W / 2, 210, 'THE GATE\nHAS FALLEN', 28, '#ff4d6d'));
     c.add(text(this, W / 2, 285, `Wave ${this.spawner.wave}/${this.level.waves}`, 16, '#ffffff'));
     if (!this.adReviveUsed) {
       c.add(button(this, W / 2, 360, 250, 54, 'REVIVE  (watch ad)', async () => {
@@ -870,7 +873,7 @@ export default class Game extends Phaser.Scene {
       level: this.level.n,
       victory,
       coins: Math.round((this.coinsEarned + (victory ? this.level.clearCoins : 0)) * this.stats.coinMult),
-      dna: victory ? this.level.clearDna : 0,
+      gems: victory ? this.level.clearGems : 0,
       stars: victory ? (this.adReviveUsed ? 1 : hpFrac >= 0.8 ? 3 : hpFrac >= 0.4 ? 2 : 1) : 0,
       kills: this.kills,
       wave: this.spawner.wave,
@@ -932,7 +935,7 @@ export default class Game extends Phaser.Scene {
     if (this.boss && this.boss.active) {
       g.fillStyle(0x000000, 1).fillRect(38, 56, W - 76, 14);
       g.fillStyle(0x56b53a, 1).fillRect(40, 58, ((W - 80) * Math.max(0, this.boss.hp)) / this.boss.maxHp, 10);
-      this.bossText.setText('GIANT BACTERIUM');
+      this.bossText.setText(this.boss.def.name.toUpperCase());
     } else this.bossText.setText('');
     for (const c of this.liveChests()) {
       if (c.hp >= c.maxHp) continue;

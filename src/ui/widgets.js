@@ -45,7 +45,7 @@ export function button(scene, x, y, w, h, label, onClick, opts = {}) {
   c.setSize(w, h);
   c.setInteractive({ useHandCursor: true });
   // Only a tap that starts on the button counts: lifting a finger that was dragging
-  // somewhere else (e.g. moving the cell) must not press it.
+  // somewhere else (e.g. moving the guard) must not press it.
   // opts.armAfter (ms): ignore touches for a moment after the button appears, so a finger
   // that is still on the screen from gameplay can't press it by accident.
   const armedAt = performance.now() + (opts.armAfter || 0);
@@ -87,16 +87,16 @@ export function panel(scene, x, y, w, h, fill = 0x2a1220, border = 0xff7aa8) {
   return g;
 }
 
-// Coins + DNA counter shown at the top of menu screens.
+// Coins + gems counter shown at the top of menu screens.
 export function currencyBar(scene, Save) {
   const y = 22;
-  scene.add.image(W_PAD, y, 'coin').setScale(3);
+  scene.add.image(W_PAD, y, 'coin').setScale(2.5);
   const coins = text(scene, W_PAD + 14, y, '', 16, '#ffd23f', 0, 0.5);
-  scene.add.image(W_PAD + 130, y, 'dna').setScale(2.4);
-  const dna = text(scene, W_PAD + 144, y, '', 16, '#ff9be6', 0, 0.5);
+  scene.add.image(W_PAD + 130, y, 'gem').setScale(2.5);
+  const gems = text(scene, W_PAD + 144, y, '', 16, '#ff9be6', 0, 0.5);
   const refresh = () => {
     coins.setText(String(Save.data.coins));
-    dna.setText(String(Save.data.dna));
+    gems.setText(String(Save.data.gems));
   };
   refresh();
   return refresh;

@@ -1,9 +1,9 @@
 {
-  "name": "cell-defender",
+  "name": "pixel-guard",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Cell Defender - a mobile roguelike cell-defense shooter",
+  "description": "Pixel Guard - a mobile pixel-art monster defense shooter",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",

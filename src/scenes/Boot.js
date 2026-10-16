@@ -14,7 +14,7 @@ export default class Boot extends Phaser.Scene {
     if (DEBUG) {
       Save.data.unlocked = 10;
       Save.data.coins = Math.max(Save.data.coins, 50000);
-      Save.data.dna = Math.max(Save.data.dna, 1000);
+      Save.data.gems = Math.max(Save.data.gems, 1000);
       Save.save();
     }
     if (START_LEVEL) this.scene.start('Game', { level: START_LEVEL });

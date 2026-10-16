@@ -23,10 +23,10 @@ export default class LevelSelect extends Phaser.Scene {
       const locked = lvl.n > Save.data.unlocked;
       const b = button(this, x, y, 150, 70, '', () => this.scene.start('Game', { level: lvl.n }), {
         disabled: locked,
-        color: parseInt(lvl.bg[2].slice(1), 16), // each level's own colour
+        color: parseInt(lvl.bg.light.slice(1), 16), // each level's own colour
       });
       if (locked) {
-        b.add(this.add.image(0, -4, 'lock').setScale(3));
+        b.add(this.add.image(0, -4, 'lock').setScale(2.5));
         b.add(text(this, 0, 22, lvl.name, 10, '#777777'));
         return;
       }
