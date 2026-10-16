@@ -139,8 +139,17 @@ async function initAds() {
   const m = await import('@capacitor-community/admob');
   ads.module = m;
   ads.plugin = m.AdMob;
-  await updateConsent(true);
-  await startAds();
+  await consentAndStart(true);
+}
+
+// One consent + start sequence at a time: a resume or an ad tap while the consent form is
+// open joins it instead of opening a second form.
+function consentAndStart(showForm) {
+  ads.flow ??= (async () => {
+    await updateConsent(showForm);
+    await startAds();
+  })().finally(() => { ads.flow = null; });
+  return ads.flow;
 }
 
 async function updateConsent(showForm) {
@@ -154,19 +163,26 @@ async function updateConsent(showForm) {
     // when the app comes back to the front).
     console.warn('Consent info unavailable', e);
     ads.canRequest = !!Save.data.adConsent;
+    ads.privacyRequired = !!Save.data.adPrivacyRequired;
+    ads.consentChecked = false; // checked again when the app comes back to the front
     emit('ads');
     return;
   }
   if (showForm && info.isConsentFormAvailable && info.status === AdmobConsentStatus.REQUIRED) {
+    ads.formOpen = true;
     try {
       info = await AdMob.showConsentForm();
     } catch (e) {
       console.warn('Consent form failed', e); // keep the answer from requestConsentInfo
+    } finally {
+      ads.formOpen = false;
     }
   }
   ads.canRequest = info.canRequestAds;
   ads.privacyRequired = info.privacyOptionsRequirementStatus === PrivacyOptionsRequirementStatus.REQUIRED;
+  ads.consentChecked = true;
   Save.data.adConsent = info.canRequestAds;
+  Save.data.adPrivacyRequired = ads.privacyRequired;
   Save.save();
   emit('ads');
 }
@@ -180,11 +196,12 @@ function startAds() {
   return ads.starting;
 }
 
-// Starts ads now if that didn't work at launch (e.g. the consent check failed offline).
+// Catches up on what failed at launch (e.g. offline): asks for consent and starts ads, or,
+// if ads already run on a saved answer, re-checks consent quietly (no form).
 async function ensureAds() {
-  if (!ads.module || ads.AdMob) return;
-  await updateConsent(true);
-  await startAds();
+  if (!ads.module) return;
+  if (!ads.AdMob) await consentAndStart(true);
+  else if (!ads.consentChecked) await consentAndStart(false);
 }
 
 async function startSdk() {
@@ -255,8 +272,14 @@ function present(kind) {
       ? ads.AdMob.showRewardVideoAd({ adId: AD_UNITS[kind] }) // resolves only when rewarded
       : ads.AdMob.showInterstitial({ adId: AD_UNITS[kind] });
     show.catch(() => { s.closed = true; s.resolve(false); });
-    // An ad that never manages to open must not block the game.
-    setTimeout(() => { if (!s.shown && !s.closed) s.resolve(false); }, 8000);
+    // An ad that never manages to open must not block the game (the wait is paused while
+    // the app is in the background).
+    const giveUp = () => {
+      if (s.shown || s.closed) return;
+      if (document.hidden) setTimeout(giveUp, 2000);
+      else s.resolve(false);
+    };
+    setTimeout(giveUp, 8000);
   });
 }
 
@@ -266,13 +289,21 @@ function loadingOverlay() {
 
 const native = {
   async showRewardedAd() {
-    if (!ads.AdMob) await Promise.race([adsReady, sleep(6000)]);
-    if (!ads.AdMob) await Promise.race([ensureAds().catch(() => {}), sleep(15000)]);
     if (ads.rewarded.state !== 'ready') {
+      // Covers the game (no taps) while ads start / an ad loads.
       const wait = loadingOverlay();
-      const ok = await Promise.race([preload('rewarded'), sleep(8000, false)]);
-      wait.remove();
-      if (!ok || ads.rewarded.state !== 'ready') {
+      try {
+        if (!ads.AdMob) await Promise.race([adsReady, sleep(6000)]);
+        if (!ads.AdMob) {
+          const flow = ensureAds().catch(() => {});
+          await Promise.race([flow, sleep(15000)]);
+          if (ads.formOpen) await flow; // the player is still answering the consent form
+        }
+        await Promise.race([preload('rewarded'), sleep(8000, false)]);
+      } finally {
+        wait.remove();
+      }
+      if (ads.rewarded.state !== 'ready') {
         notice('No ad available right now. Try again later.');
         return false;
       }
@@ -331,15 +362,18 @@ async function initBilling() {
   emit('prices');
 }
 
-// One-time packs bought earlier (e.g. before reinstalling the app) come back.
+// One-time packs bought earlier (e.g. before reinstalling the app) come back. A purchase
+// not yet acknowledged is new: the 'approved' handler delivers it.
 function syncOwned() {
   if (!window.CdvPurchase) return false;
+  const { store, Platform } = window.CdvPurchase;
   let restored = false;
   for (const item of STORE) {
-    if (item.oneTime && !Save.data.purchases[item.id] && !waiting.has(item.id) && window.CdvPurchase.store.owned(item.id)) {
-      deliver(item.id, null);
-      restored = true;
-    }
+    if (!item.oneTime || Save.data.purchases[item.id] || waiting.has(item.id) || !store.owned(item.id)) continue;
+    const product = store.get(item.id, Platform.GOOGLE_PLAY);
+    if (product && store.findInLocalReceipts(product)?.isAcknowledged === false) continue;
+    deliver(item.id, null);
+    restored = true;
   }
   if (restored) notice('Your purchases were restored.');
   return restored;
@@ -347,6 +381,7 @@ function syncOwned() {
 
 async function billingPurchase(productId) {
   if (!C) await Promise.race([billingReady, sleep(5000)]);
+  await refreshing; // the plugin handles one Google Play call at a time
   const offer = C?.store.get(productId, C.Platform.GOOGLE_PLAY)?.getOffer();
   if (!offer) {
     notice('The store is not available right now. Check your connection and try again.');
@@ -379,9 +414,11 @@ async function billingRestore() {
     notice('The store is not available right now.');
     return false;
   }
-  const answered = await Promise.race([C.store.restorePurchases().then(() => true), sleep(15000, false)]);
-  if (!answered) {
-    notice('Google Play is not responding. Try again later.');
+  await refreshing;
+  // Google Play answers with an error object (not an exception) when it can't be reached.
+  const err = await Promise.race([C.store.restorePurchases(), sleep(15000, { timeout: true })]);
+  if (err) {
+    notice('Google Play could not be reached. Try again later.');
     return false;
   }
   if (!syncOwned()) notice('Nothing to restore.');
@@ -389,6 +426,7 @@ async function billingRestore() {
 }
 
 let lastResumeAt = 0;
+let refreshing = null; // the purchase check started when the app came back to the front
 let adsReady = Promise.resolve();
 let billingReady = Promise.resolve();
 
@@ -445,7 +483,11 @@ export const Monetization = {
   onResume() {
     if (!isNative() || pending || Date.now() - lastResumeAt < 60_000) return;
     lastResumeAt = Date.now();
-    C?.store.restorePurchases().catch(() => {});
+    if (C) {
+      refreshing = Promise.race([C.store.restorePurchases(), sleep(5000)])
+        .catch(() => {})
+        .finally(() => { refreshing = null; });
+    }
     ensureAds().catch(() => {});
   },
   /** Count a finished level (win or lose) towards the next between-levels ad. */
@@ -472,9 +514,9 @@ export const Monetization = {
   async showPrivacyOptions() {
     if (!ads.plugin) return;
     try {
+      await ads.flow; // never on top of the consent form
       await ads.plugin.showPrivacyOptionsForm();
-      await updateConsent(false);
-      await startAds();
+      await consentAndStart(false);
     } catch (e) {
       console.warn('Privacy options unavailable', e);
     }

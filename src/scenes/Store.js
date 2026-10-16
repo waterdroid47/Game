@@ -40,9 +40,10 @@ export default class Store extends Phaser.Scene {
     const update = () => {
       STORE.forEach((item, i) => {
         const owned = item.oneTime && Save.data.purchases[item.id];
-        const price = Monetization.price(item); // null while Google Play is not reachable
+        // Price is null until Google Play answers; a tap then explains that it isn't available.
+        const price = Monetization.price(item);
         const label = owned ? 'OWNED' : price ?? '...';
-        buttons[i].setLabel(label).setEnabled(!owned && !!price);
+        buttons[i].setLabel(label).setEnabled(!owned);
         buttons[i].label.setFontSize(label.length > 8 ? 12 : 15); // long local prices, e.g. 9,99 lei
       });
       refresh();

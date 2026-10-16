@@ -837,6 +837,7 @@ export default class Game extends Phaser.Scene {
     if (!this.adReviveUsed) {
       c.add(button(this, W / 2, 360, 250, 54, 'REVIVE  (watch ad)', async () => {
         if (await Monetization.showRewardedAd('revive')) {
+          if (this.finished || !c.active) return; // the run ended meanwhile
           this.adReviveUsed = true;
           c.destroy();
           this.revive();

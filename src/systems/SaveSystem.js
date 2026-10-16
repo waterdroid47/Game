@@ -13,6 +13,7 @@ const defaults = () => ({
   txns: [], // store transaction ids already granted (so a purchase is never granted twice)
   adsRemoved: false, // any store purchase removes the ads between levels
   adConsent: false, // last ad-consent answer from Google's form (used when offline)
+  adPrivacyRequired: false, // whether that answer needs the PRIVACY button (EU)
   ads: { day: '', count: 0 },
   inter: { since: 0, every: 3 }, // levels finished since the last between-levels ad
   settings: { sound: true },
