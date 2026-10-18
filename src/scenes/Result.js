@@ -24,6 +24,7 @@ export default class Result extends Phaser.Scene {
       d.stars[r.level] = Math.max(d.stars[r.level] || 0, r.stars);
     }
     Save.save();
+    Monetization.levelFinished();
 
     this.add.tileSprite(0, 0, W, H, 'bg').setOrigin(0);
     const refresh = currencyBar(this, Save);
@@ -61,9 +62,18 @@ export default class Result extends Phaser.Scene {
 
     const hasNext = r.victory && r.level < LEVELS.length;
     button(this, W / 2, 480, 220, 50, hasNext ? 'NEXT LEVEL' : 'RETRY', () => {
-      this.scene.start('Game', { level: hasNext ? r.level + 1 : r.level });
+      this.leave('Game', { level: hasNext ? r.level + 1 : r.level });
     }, { size: 20, armAfter: 600 });
-    button(this, W / 2 - 60, 548, 110, 40, 'UPGRADES', () => this.scene.start('Shop'), { color: 0x2b6cb0, size: 13, armAfter: 600 });
-    button(this, W / 2 + 60, 548, 110, 40, 'MENU', () => this.scene.start('Menu'), { color: 0x6b2b4a, size: 13, armAfter: 600 });
+    button(this, W / 2 - 60, 548, 110, 40, 'UPGRADES', () => this.leave('Shop'), { color: 0x2b6cb0, size: 13, armAfter: 600 });
+    button(this, W / 2 + 60, 548, 110, 40, 'MENU', () => this.leave('Menu'), { color: 0x6b2b4a, size: 13, armAfter: 600 });
+    this.leaving = false;
+  }
+
+  // Every few levels a skippable ad is shown here, before moving on (Android app only).
+  async leave(scene, data) {
+    if (this.leaving || Monetization.busy()) return;
+    this.leaving = true;
+    await Monetization.betweenLevels();
+    if (this.sys.isActive()) this.scene.start(scene, data);
   }
 }

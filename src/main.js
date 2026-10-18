@@ -9,6 +9,7 @@ import Game from './scenes/Game.js';
 import LevelUp from './scenes/LevelUp.js';
 import Pause from './scenes/Pause.js';
 import Result from './scenes/Result.js';
+import { initNative } from './services/native.js';
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -25,6 +26,9 @@ const game = new Phaser.Game({
 
 // Exposed for automated tests.
 window.__game = game;
+
+// Android app: real ads + payments, Back button.
+initNative(game);
 
 if (import.meta.env.PROD && 'serviceWorker' in navigator && !window.Capacitor) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
