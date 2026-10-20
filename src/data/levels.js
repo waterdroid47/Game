@@ -19,11 +19,11 @@ const LEVEL_DEFS = [
   // Monster Lairs: each is full of one kind of monster, ruled by a giant King.
   {
     name: 'Slime Bog', boss: 'slimeking', bg: { base: '#132a1c', dark: '#0e2015', light: '#3f8a3a', deco: 'bubbles' },
-    pool: { slime: 8, bigslime: 5, golem: 2, bat: 1, ghost: 1, skeleton: 1 },
+    pool: { slime: 8, bigslime: 5, golem: 2, bat: 1, ghost: 1, skeleton: 1 }, countMult: 0.9, intervalMult: 1.1,
   },
   {
     name: 'Bat Caverns', boss: 'batqueen', bg: { base: '#1a1420', dark: '#120d17', light: '#6a2a5a', deco: 'drips' },
-    pool: { bat: 12, slime: 3, skeleton: 2, ghost: 2, golem: 1 }, countMult: 1.2,
+    pool: { bat: 12, slime: 3, skeleton: 2, ghost: 2, golem: 1 }, countMult: 1.1,
   },
   {
     name: 'Haunted Halls', boss: 'ghostlord', bg: { base: '#161a24', dark: '#10131b', light: '#4a5a78', deco: 'webs' },
@@ -31,19 +31,19 @@ const LEVEL_DEFS = [
   },
   {
     name: 'Stone Quarry', boss: 'golemtitan', bg: { base: '#2a2620', dark: '#201d18', light: '#6a6050', deco: 'rubble' },
-    pool: { golem: 9, slime: 3, skeleton: 2, bigslime: 1 }, countMult: 0.65, intervalMult: 1.2,
+    pool: { golem: 9, slime: 3, skeleton: 2, bigslime: 1 }, countMult: 0.55, intervalMult: 2.2,
   },
   {
     name: 'Bone Crypt', boss: 'skeletonking', bg: { base: '#1c1818', dark: '#141111', light: '#6a5e54', deco: 'skulls' },
-    pool: { skeleton: 8, ghost: 2, bat: 2, golem: 1 }, countMult: 0.75,
+    pool: { skeleton: 8, ghost: 2, bat: 2, golem: 1 }, countMult: 0.75, intervalMult: 1.3,
   },
   {
     name: 'Ogre Stronghold', boss: 'ogrewarlord', bg: { base: '#24180f', dark: '#1b120b', light: '#6a4422', deco: 'bricks' },
-    pool: { brute: 8, golem: 2, skeleton: 2, slime: 1 }, countMult: 0.7,
+    pool: { brute: 8, golem: 2, skeleton: 2, slime: 1 }, countMult: 0.6, intervalMult: 2.3,
   },
   {
     name: "Dragon's Peak", boss: 'elderdragon', bg: { base: '#2a0a12', dark: '#1e070d', light: '#9a3020', deco: 'embers' },
-    pool: { whelp: 8, skeleton: 2, bat: 2, golem: 1 }, countMult: 0.85, gems: 25,
+    pool: { whelp: 8, skeleton: 2, bat: 2, golem: 1 }, countMult: 0.8, intervalMult: 1.7, gems: 25,
   },
 ];
 
@@ -96,8 +96,8 @@ export const LEVELS = LEVEL_DEFS.map((d, i) => {
 export const NIGHTMARE = {
   cost: 5000,
   requires: 10, // beat this normal level first
-  hp: (k) => 3.6 + 0.22 * (k - 1),
-  bossHp: (k) => (3.6 + 0.22 * (k - 1)) * (1 + 0.04 * (k - 1)),
+  hp: (k) => 3.6 + 0.15 * (k - 1),
+  bossHp: (k) => (3.6 + 0.15 * (k - 1)) * (1 + 0.04 * (k - 1)),
   dmg: (k) => 2.6 + 0.08 * (k - 1),
   shot: (k) => 2.0 + 0.06 * (k - 1),
   speed: 1.12,

@@ -17,9 +17,9 @@ export const ENEMIES = {
   },
   ogre: { name: 'Ogre King', tex: 'ogre', hp: 150, speed: 15, dmg: 25, xp: 8, coins: 10, radius: 20, chest: true, color: 0x008751 },
   // Lair monsters (levels 11+).
-  brute: { name: 'Ogre Brute', tex: 'brute', hp: 40, speed: 21, dmg: 16, xp: 3, coins: 3, radius: 18, color: 0xab5236 },
+  brute: { name: 'Ogre Brute', tex: 'brute', hp: 32, speed: 21, dmg: 16, xp: 3, coins: 3, radius: 18, color: 0xab5236 },
   whelp: {
-    name: 'Dragon Whelp', tex: 'whelp', hp: 22, speed: 34, dmg: 12, xp: 2, coins: 2, radius: 15, color: 0x00e436,
+    name: 'Dragon Whelp', tex: 'whelp', hp: 16, speed: 34, dmg: 12, xp: 2, coins: 2, radius: 15, color: 0x00e436,
     wobble: 35, wobbleSpeed: 2, shoot: { every: 4, speed: 140, dmg: 6, count: 1, tex: 'fireball' },
   },
 
@@ -73,7 +73,7 @@ export const ENEMIES = {
     phase2: { at: 0.5, cd: 1, toast: 'The Ghost Lord fades in and out!' },
   },
   golemtitan: {
-    name: 'Golem Titan', tex: 'golemtitan', scale: 4, bodyDy: 2.5, hp: 2100, speed: 16, dmg: 40, xp: 0, coins: 180, radius: 32, boss: true, color: 0x5f574f,
+    name: 'Golem Titan', tex: 'golemtitan', scale: 4, bodyDy: 2.5, hp: 1500, speed: 16, dmg: 40, xp: 0, coins: 180, radius: 32, boss: true, color: 0x5f574f,
     holdY: 120, sway: [80, 0.4],
     attacks: [
       { type: 'charge', every: 6.5, warn: 1, speed: 300, then: { type: 'ring', count: 8, speed: 130, dmg: 10, tex: 'rock' }, p2: { repeat: 2 } },
@@ -83,7 +83,7 @@ export const ENEMIES = {
     phase2: { at: 0.5, cd: 0.75, toast: 'The ground shakes!' },
   },
   skeletonking: {
-    name: 'Skeleton King', tex: 'skeletonking', scale: 5, bodyDy: 2.5, hp: 1700, speed: 22, dmg: 35, xp: 0, coins: 190, radius: 32, boss: true, color: 0xffec27,
+    name: 'Skeleton King', tex: 'skeletonking', scale: 5, bodyDy: 2.5, hp: 1400, speed: 22, dmg: 35, xp: 0, coins: 190, radius: 32, boss: true, color: 0xffec27,
     holdY: 140, sway: [110, 0.8],
     attacks: [
       { type: 'fan', every: 2.2, count: 7, spread: 70, speed: 170, dmg: 8, tex: 'bone' },
@@ -94,7 +94,7 @@ export const ENEMIES = {
     phase2: { at: 0.5, cd: 0.7, toast: 'The Skeleton King raises his army!' },
   },
   ogrewarlord: {
-    name: 'Ogre Warlord', tex: 'ogrewarlord', scale: 4, hp: 1900, speed: 18, dmg: 45, xp: 0, coins: 200, radius: 40, boss: true, color: 0xff004d,
+    name: 'Ogre Warlord', tex: 'ogrewarlord', scale: 4, hp: 1400, speed: 18, dmg: 45, xp: 0, coins: 200, radius: 40, boss: true, color: 0xff004d,
     holdY: 130, sway: [100, 0.5],
     attacks: [
       { type: 'charge', every: 5.5, warn: 0.8, speed: 380, p2: { repeat: 2 } }, // club rush
@@ -105,7 +105,7 @@ export const ENEMIES = {
     phase2: { at: 0.5, cd: 0.7, toast: 'The Warlord goes berserk!' },
   },
   elderdragon: {
-    name: 'Elder Dragon', tex: 'elderdragon', scale: 3, hp: 2100, speed: 22, dmg: 45, xp: 0, coins: 300, radius: 56, boss: true, color: 0x7e2553,
+    name: 'Elder Dragon', tex: 'elderdragon', scale: 3, hp: 1450, speed: 22, dmg: 45, xp: 0, coins: 300, radius: 56, boss: true, color: 0x7e2553,
     holdY: 150, sway: [95, 0.6],
     attacks: [
       { type: 'fan', every: 1.8, count: 7, spread: 80, speed: 160, dmg: 10, tex: 'darkfire' },
