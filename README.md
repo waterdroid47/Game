@@ -5,11 +5,11 @@ A pixel-art monster defense shooter for phones, built with [Phaser 3](https://ph
 You are a little pixel guard holding the castle gate. Slide your finger to move: left and right, and up and down in the lower part of the screen to dodge the dragon's fireballs. You shoot automatically, and touching a monster hurts. Waves of monsters get stronger every wave.
 - **Monsters:**
   - slimes and slow stone golems from level 1;
-  - big slimes that split, and ghosts that sway slowly and always take 3 hits, from level 3;
+  - big slimes that split, and ghosts that sway slowly and take 3 hits (more in Haunted Halls and in Nightmare), from level 3;
   - fast bats that pop in one hit, and skeleton archers that shoot bones, from level 4;
   - an Ogre King (drops a treasure chest) in later waves;
   - Ogre Brutes and fire-spitting Dragon Whelps in the Monster Lairs.
-- **Bosses:** the Red Dragon guards levels 1–10. Each Monster Lair has its own giant King: Slime King, Bat Queen, Ghost Lord, Golem Titan, Skeleton King, Ogre Warlord and Elder Dragon. Every boss has its own attacks: fireball fans, rings, meteor rain with red warning columns, charges and teleports. At half health it gets **enraged**: it attacks faster and adds new attacks.
+- **Bosses:** the Red Dragon guards levels 1–10. Each Monster Lair has its own giant King: Slime King, Bat Queen, Ghost Lord, Golem Titan, Skeleton King, Ogre Warlord and Elder Dragon. Every boss has its own attacks: fireball fans, rings, meteor rain with red warning columns, charges and teleports. At half health (sooner in Nightmare) it gets **enraged**: it attacks faster and adds new attacks.
 - **Health:** only **hearts** heal. A defeated monster sometimes drops one; it falls slowly and you have to catch it.
 - **Level-ups:** kill monsters to level up. You get two level-ups in the first wave, then one about every wave and a half (Fast Learner in the shop gives more). Pick 1 of 3 upgrades. Each card shows exactly what changes, and maxed-out upgrades are never offered. These are stronger bolts or new **attack stances**: Fire Fan, Lightning Beam, Shield Orbit, Spirit Missiles and Shockwave. Each stance evolves at level 5.
 - **Treasure chests:** catch the ones dropped by the Ogre King, or shoot them open, for extra upgrades.
@@ -37,7 +37,7 @@ Controls: drag anywhere on the screen to move (left/right, and up/down in the lo
 Testing URL flags:
 | Flag | Effect |
 |------|--------|
-| `?debug` | All levels unlocked, lots of currency, in-game SKIP / +LVL buttons |
+| `?debug` | All levels and Nightmare unlocked (saved – use RESET to undo), lots of currency, in-game SKIP / +LVL buttons |
 | `?level=3` | Jump straight into level 3 (1–17) |
 | `?nightmare` | With `?level=N`: Nightmare level N |
 | `?autoplay` | A bot plays (used for balance testing) |

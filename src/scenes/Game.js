@@ -140,7 +140,7 @@ export default class Game extends Phaser.Scene {
 
     // ----- collisions -----
     this.physics.add.overlap(this.bullets, this.enemies, this.onBulletHit, null, this);
-    this.physics.add.overlap(this.missiles, this.enemies, (m) => this.explodeMissile(m), null, this);
+    this.physics.add.overlap(this.missiles, this.enemies, (m) => this.explodeMissile(m), (m, e) => !e.phased, this);
     this.physics.add.overlap(this.player, this.enemyBullets, this.onPlayerShot, null, this);
     this.physics.add.overlap(this.player, this.enemies, this.onPlayerTouchEnemy, null, this);
     this.physics.add.overlap(this.player, this.pickups, this.onPickup, null, this);
@@ -218,13 +218,17 @@ export default class Game extends Phaser.Scene {
   // Simple bot used for automated tests: chase the lowest enemy, grab chests, dodge shots.
   autoTarget() {
     let best = null;
-    if (this.hp < this.stats.maxHp * 0.7) for (const h of this.liveHearts()) if (h.y > 80) return h.x;
-    for (const c of this.liveChests()) if (c.y > 40) return c.x;
-    for (const e of this.enemies.getChildren()) {
-      if (!e.active || e.dying || e.y < 0) continue;
-      if (!best || e.y > best.y) best = e;
+    let x = null;
+    if (this.hp < this.stats.maxHp * 0.7) x = this.liveHearts().find((h) => h.y > 80)?.x ?? null;
+    if (x === null) x = this.liveChests().find((c) => c.y > 40)?.x ?? null;
+    if (x === null) {
+      for (const e of this.enemies.getChildren()) {
+        // A boss that is charging or flying back up isn't something to stand under.
+        if (!e.active || e.dying || e.y < 0 || (e.brain && e.brain.state !== 'sway')) continue;
+        if (!best || e.y > best.y) best = e;
+      }
+      x = best ? best.x : W / 2;
     }
-    let x = best ? best.x : W / 2;
     for (const b of this.enemyBullets.getChildren()) {
       if (b.active && b.y > this.player.y - 120 && b.y < this.player.y && Math.abs(b.x - x) < 22) x += b.x < x ? 40 : -40;
     }
@@ -234,6 +238,10 @@ export default class Game extends Phaser.Scene {
       for (const w of brain.warnings) if (Math.abs(w.x - x) < 30) x += w.x < x ? 50 : -50;
       if ((brain.state === 'windup' || brain.state === 'dash') && Math.abs(x - brain.target.x) < this.boss.def.radius + 24) {
         x = brain.target.x + (brain.target.x < W / 2 ? 1 : -1) * (this.boss.def.radius + 40);
+      }
+      const b = this.boss;
+      if (['pause', 'return'].includes(brain.state) && b.y > 380 && Math.abs(x - b.x) < b.def.radius + 24) {
+        x = b.x + (b.x < W / 2 ? 1 : -1) * (b.def.radius + 40);
       }
     }
     return Phaser.Math.Clamp(x, 16, W - 16);
@@ -422,7 +430,7 @@ export default class Game extends Phaser.Scene {
       if (!m.active) continue;
       m.life -= dt;
       if (m.life <= 0 || m.y < -30) { this.explodeMissile(m); continue; }
-      if (!m.target || !m.target.active || m.target.dying) m.target = this.nearestEnemy(m.x, m.y);
+      if (!m.target || !m.target.active || m.target.dying || m.target.phased) m.target = this.nearestEnemy(m.x, m.y);
       if (m.target) {
         const want = Phaser.Math.Angle.Between(m.x, m.y, m.target.x, m.target.y);
         m.heading = Phaser.Math.Angle.RotateTo(m.heading, want, 6 * dt);
@@ -656,7 +664,8 @@ export default class Game extends Phaser.Scene {
       if (e.flashT > 0) {
         e.flashT -= dt;
         if (e.flashT <= 0) {
-          if (e.enraged) e.setTint(0xff9090);
+          if (e.brain?.state === 'windup') e.setTint(0xff6060); // a charge is coming
+          else if (e.enraged) e.setTint(0xff9090);
           else e.clearTint();
         }
       }
@@ -773,6 +782,8 @@ export default class Game extends Phaser.Scene {
       this.bossDefeated = true;
       e.brain?.clear();
       this.warnGfx.clear();
+      // Shots still in the air vanish: a beaten boss can't win the fight afterwards.
+      for (const b of this.enemyBullets.getChildren()) if (b.active) b.disableBody(true, true);
       this.levelUpQueue.length = 0;
       for (const c of [...this.pickups.getChildren(), ...this.hearts.getChildren()]) {
         c.setActive(false).setVisible(false);
@@ -834,7 +845,7 @@ export default class Game extends Phaser.Scene {
   }
 
   hurtPlayer(dmg) {
-    if (this.invuln > 0 || this.dead || this.finished) return;
+    if (this.invuln > 0 || this.dead || this.finished || this.bossDefeated) return;
     this.hp -= dmg;
     sfx.hurt();
     this.cameras.main.shake(120, 0.008);

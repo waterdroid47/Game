@@ -76,7 +76,7 @@ export default class BossBrain {
     const g = this.game;
     this.phase = 2;
     this.e.enraged = true;
-    if (!this.e.flashT) this.e.setTint(0xff9090);
+    if (!(this.e.flashT > 0)) this.e.setTint(0xff9090);
     this.holdY = this.def.phase2?.holdY ?? this.holdY;
     for (const slot of this.attacks) if (slot.a.phase === 2) slot.t = 1.2;
     g.showBanner('ENRAGED!', '#ff4d6d');
@@ -92,7 +92,7 @@ export default class BossBrain {
     switch (this.state) {
       case 'enter':
         e.y += sp * dt;
-        if (e.y >= this.holdY) this.state = 'sway';
+        if (e.y >= this.holdY) this.backToSway(); // starts swaying from the middle, no jump
         break;
       case 'sway':
         e.x = this.baseX + Math.sin(this.t * this.def.sway[1]) * this.amp;
@@ -125,9 +125,12 @@ export default class BossBrain {
           } else this.state = 'return';
         }
         break;
-      case 'return':
-        if (this.moveTo(e.x, this.holdY, this.charge.speed * 0.5, dt)) this.backToSway();
+      case 'return': {
+        // Back up, and back inside the sway range so swaying continues without a jump.
+        const x = Phaser.Math.Clamp(e.x, this.baseX - this.amp, this.baseX + this.amp);
+        if (this.moveTo(x, this.holdY, this.charge.speed * 0.5, dt)) this.backToSway();
         break;
+      }
       case 'blinkOut':
         this.wait -= dt;
         e.alpha = Math.max(0.15, this.wait / 0.3);
@@ -189,9 +192,11 @@ export default class BossBrain {
     this.state = 'windup';
     this.wait = this.charge.warn ?? 0.8;
     this.from = { x: this.e.x, y: this.e.y };
-    this.target = { x: Phaser.Math.Clamp(p.x, 30, W - 30), y: Phaser.Math.Clamp(p.y - 10, 300, LOWEST) };
+    // The whole boss stays on screen, wherever the guard stands.
+    const half = Math.min(W / 2, this.e.displayWidth / 2);
+    this.target = { x: Phaser.Math.Clamp(p.x, half, W - half), y: Phaser.Math.Clamp(p.y - 10, 300, LOWEST) };
     this.line = { ...this.target };
-    if (!this.e.flashT) this.e.setTint(0xff6060);
+    if (!(this.e.flashT > 0)) this.e.setTint(0xff6060);
   }
 
   // ----- attacks -----

@@ -69,7 +69,8 @@ export default class LevelSelect extends Phaser.Scene {
       const stars = prog.stars[lvl.n] || 0;
       for (let s = 0; s < 3; s++) b.add(this.add.image(-18 + s * 18, 19, s < stars ? 'star' : 'starEmpty').setScale(2));
     });
-    if (page >= 1 && !Save.data.flags.seenLairs) {
+    // The Menu's NEW! badge goes once an unlocked lair has been seen.
+    if (!nightmare && page >= 1 && prog.unlocked > PER_PAGE && !Save.data.flags.seenLairs) {
       Save.data.flags.seenLairs = true;
       Save.save();
     }
