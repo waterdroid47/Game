@@ -15,15 +15,16 @@ export default class LevelSelect extends Phaser.Scene {
     super('LevelSelect');
   }
 
-  // The last tab and page are remembered while the game runs.
-  static last = { mode: 'normal', page: null };
+  // The last tab is remembered while the game runs.
+  static last = { mode: 'normal' };
 
   create(data) {
     const mode = data?.mode ?? LevelSelect.last.mode;
     const prog = Save.progress(mode);
     const pageOfUnlocked = Math.floor((Math.min(prog.unlocked, LEVELS.length) - 1) / PER_PAGE);
-    const page = Phaser.Math.Clamp(data?.page ?? (LevelSelect.last.mode === mode ? LevelSelect.last.page : null) ?? pageOfUnlocked, 0, PAGES - 1);
-    LevelSelect.last = { mode, page };
+    // Opens on the page with the newest unlocked level (the arrows pass their own page).
+    const page = Phaser.Math.Clamp(data?.page ?? pageOfUnlocked, 0, PAGES - 1);
+    LevelSelect.last = { mode };
     const nightmare = mode === 'nightmare';
 
     this.add.tileSprite(0, 0, W, H, 'bg').setOrigin(0);
