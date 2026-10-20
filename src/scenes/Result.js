@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { W, H } from '../config.js';
-import { LEVELS } from '../data/levels.js';
+import { LEVELS, getLevel } from '../data/levels.js';
 import { Monetization } from '../services/monetization.js';
 import { Save } from '../systems/SaveSystem.js';
 import { sfx } from '../systems/Audio.js';
@@ -12,25 +12,27 @@ export default class Result extends Phaser.Scene {
   }
 
   create(r) {
-    // Save rewards and progress.
+    // Save rewards and progress (normal and Nightmare levels are tracked separately).
+    const mode = r.mode === 'nightmare' ? 'nightmare' : 'normal';
     const d = Save.data;
+    const prog = Save.progress(mode);
     d.coins += r.coins;
     d.gems += r.gems;
     d.stats.runs += 1;
     d.stats.kills += r.kills;
-    d.bestWave[r.level] = Math.max(d.bestWave[r.level] || 0, r.wave);
+    prog.bestWave[r.level] = Math.max(prog.bestWave[r.level] || 0, r.wave);
     if (r.victory) {
-      d.unlocked = Math.max(d.unlocked, Math.min(LEVELS.length, r.level + 1));
-      d.stars[r.level] = Math.max(d.stars[r.level] || 0, r.stars);
+      prog.unlocked = Math.max(prog.unlocked, Math.min(LEVELS.length, r.level + 1));
+      prog.stars[r.level] = Math.max(prog.stars[r.level] || 0, r.stars);
     }
     Save.save();
     Monetization.levelFinished();
 
     this.add.tileSprite(0, 0, W, H, 'bg').setOrigin(0);
     const refresh = currencyBar(this, Save);
-    const lvl = LEVELS[r.level - 1];
+    const lvl = getLevel(r.level, mode);
     text(this, W / 2, 92, r.victory ? 'VICTORY!' : 'DEFEATED', 40, r.victory ? '#7dff7a' : '#ff4d6d');
-    text(this, W / 2, 132, `Level ${lvl.n} · ${lvl.name}`, 14, '#ffb0cc');
+    text(this, W / 2, 132, `${mode === 'nightmare' ? 'Nightmare' : 'Level'} ${lvl.n} · ${lvl.name}`, 14, mode === 'nightmare' ? '#ff6080' : '#ffb0cc');
 
     if (r.victory) {
       for (let s = 0; s < 3; s++) {
@@ -62,10 +64,14 @@ export default class Result extends Phaser.Scene {
 
     const hasNext = r.victory && r.level < LEVELS.length;
     button(this, W / 2, 480, 220, 50, hasNext ? 'NEXT LEVEL' : 'RETRY', () => {
-      this.leave('Game', { level: hasNext ? r.level + 1 : r.level });
+      this.leave('Game', { level: hasNext ? r.level + 1 : r.level, mode });
     }, { size: 20, armAfter: 600 });
     button(this, W / 2 - 60, 548, 110, 40, 'UPGRADES', () => this.leave('Shop'), { color: 0x2b6cb0, size: 13, armAfter: 600 });
     button(this, W / 2 + 60, 548, 110, 40, 'MENU', () => this.leave('Menu'), { color: 0x6b2b4a, size: 13, armAfter: 600 });
+    // After the last normal level: point to Nightmare mode.
+    if (mode === 'normal' && r.victory && r.level === LEVELS.length && !Save.data.nightmare.owned) {
+      text(this, W / 2, 600, 'Ready for more? NIGHTMARE mode is in PLAY', 11, '#ff6080');
+    }
     this.leaving = false;
   }
 

@@ -35,6 +35,11 @@ export default class Menu extends Phaser.Scene {
     this.tweens.add({ targets: guard, y: 262, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
 
     button(this, W / 2, 350, 220, 54, 'PLAY', () => this.scene.start('LevelSelect'), { size: 24 });
+    // New levels unlocked but not seen yet.
+    if (Save.data.unlocked > 10 && !Save.data.flags.seenLairs) {
+      const badge = text(this, W / 2 + 92, 330, 'NEW!', 13, '#ffec27').setAngle(12);
+      this.tweens.add({ targets: badge, scale: 1.2, duration: 400, yoyo: true, repeat: -1 });
+    }
     button(this, W / 2, 418, 220, 44, 'UPGRADES', () => this.scene.start('Shop'), { color: 0x2b6cb0 });
     button(this, W / 2, 474, 220, 44, 'STORE', () => this.scene.start('Store'), { color: 0x9b2c8c });
 

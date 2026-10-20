@@ -2,11 +2,14 @@ import Phaser from 'phaser';
 import { AUTOPLAY, DEBUG, H, WALL_Y, MOVE_TOP, PLAYER_Y, SPEED, SPRITE_SCALE, W } from '../config.js';
 import { ENEMIES } from '../data/enemies.js';
 import { LEVEL_UPS, getLevel } from '../data/levels.js';
+import { HEART } from '../data/pickups.js';
 import { enemyAdapt, metaStats } from '../data/shop.js';
 import { CARDS, STANCES, STANCE_MAX, STANCE_STATS, canTake, rollCards } from '../data/upgrades.js';
 import { Monetization } from '../services/monetization.js';
 import { sfx } from '../systems/Audio.js';
 import { animate } from '../art/pixelSprites.js';
+import BossBrain from '../systems/BossBrain.js';
+import { Save } from '../systems/SaveSystem.js';
 import WaveSpawner from '../systems/WaveSpawner.js';
 import { button, text } from '../ui/widgets.js';
 
@@ -25,7 +28,8 @@ export default class Game extends Phaser.Scene {
   }
 
   init(data) {
-    this.level = getLevel(data?.level);
+    this.mode = data?.mode === 'nightmare' ? 'nightmare' : 'normal';
+    this.level = getLevel(data?.level, this.mode);
   }
 
   create() {
@@ -37,11 +41,13 @@ export default class Game extends Phaser.Scene {
     // The castle wall the guard defends (monsters that reach it hurt the guard).
     this.add.tileSprite(0, WALL_Y - 4, W, 24, 'wall').setOrigin(0, 0).setTileScale(2, 2).setDepth(2);
     this.add.rectangle(0, WALL_Y + 20, W, H - WALL_Y - 20, 0x2b2733).setOrigin(0).setDepth(2);
+    if (this.mode === 'nightmare') this.add.rectangle(0, 0, W, H, 0x300010, 0.18).setOrigin(0).setDepth(1);
 
     // ----- run state -----
     const meta = (this.meta = metaStats());
-    // Enemies get partly tougher as the player buys shop upgrades (see data/shop.js).
-    this.adapt = enemyAdapt(meta);
+    // Enemies get partly tougher as the player buys shop upgrades (see data/shop.js) –
+    // except in Nightmare, where every upgrade counts in full.
+    this.adapt = this.level.noAdapt ? { hp: 1, dmg: 1 } : enemyAdapt(meta);
     this.stats = {
       damage: 5 * meta.damageMult,
       fireRate: BASE_FIRE_RATE * meta.fireRateMult,
@@ -59,6 +65,10 @@ export default class Game extends Phaser.Scene {
     this.stances = { spread: 0, laser: 0, orbit: 0, missile: 0, pulse: 0 };
     this.cardLevels = {};
     this.hp = this.stats.maxHp;
+    this.startMaxHp = this.stats.maxHp; // stars compare with this (Iron Heart mustn't cost stars)
+    this.runTime = 0;
+    this.bossStart = 0;
+    this.heartStats = { dropped: 0, caught: 0 };
     this.runLevel = 1;
     this.waveXp = 0;
     this.xpSteps = [];
@@ -76,7 +86,7 @@ export default class Game extends Phaser.Scene {
     this.takeAllUsed = false;
     this.graveyard = [];
     this.floatCount = 0;
-    this.cd = { main: 0.5, spread: 1, laser: 2, missile: 1.5, pulse: 2, chest: Phaser.Math.Between(45, 60) };
+    this.cd = { main: 0.5, spread: 1, laser: 2, missile: 1.5, pulse: 2, chest: Phaser.Math.Between(45, 60), heart: HEART.cooldown };
     this.laserTime = 0;
     this.laserTick = 0;
     this.orbitAngle = 0;
@@ -85,9 +95,10 @@ export default class Game extends Phaser.Scene {
     // ----- groups -----
     this.enemies = this.physics.add.group();
     this.bullets = this.physics.add.group({ maxSize: 400 });
-    this.enemyBullets = this.physics.add.group({ maxSize: 200 });
+    this.enemyBullets = this.physics.add.group({ maxSize: 320 });
     this.missiles = this.physics.add.group({ maxSize: 60 });
-    this.pickups = this.physics.add.group();
+    this.pickups = this.physics.add.group(); // chests
+    this.hearts = this.physics.add.group(); // only the guard can touch these
 
     // ----- player -----
     this.player = animate(this.physics.add.sprite(W / 2, PLAYER_Y, 'guard').setScale(SPRITE_SCALE).setDepth(7));
@@ -104,6 +115,7 @@ export default class Game extends Phaser.Scene {
       emitting: false,
     }).setDepth(8);
     this.laserGfx = this.add.graphics().setDepth(6);
+    this.warnGfx = this.add.graphics().setDepth(4); // boss attack warnings
     this.barGfx = this.add.graphics().setDepth(9);
 
     // ----- input: slide anywhere to move (left/right and up/down in the lower part) -----
@@ -132,6 +144,7 @@ export default class Game extends Phaser.Scene {
     this.physics.add.overlap(this.player, this.enemyBullets, this.onPlayerShot, null, this);
     this.physics.add.overlap(this.player, this.enemies, this.onPlayerTouchEnemy, null, this);
     this.physics.add.overlap(this.player, this.pickups, this.onPickup, null, this);
+    this.physics.add.overlap(this.player, this.hearts, this.onHeart, null, this);
     this.physics.add.overlap(this.bullets, this.pickups, this.onBulletHitChest, null, this);
 
     this.createHud();
@@ -160,6 +173,7 @@ export default class Game extends Phaser.Scene {
     if (this.dead || this.finished) return;
 
     const dt = (Math.min(delta, 50) / 1000) * SPEED;
+    this.runTime += dt;
     this.bg.tilePositionY -= dt * 12;
     this.invuln = Math.max(0, this.invuln - dt);
 
@@ -169,6 +183,9 @@ export default class Game extends Phaser.Scene {
     this.updateProjectiles(dt);
     this.spawner.update(dt);
     this.updateChests(dt);
+    this.updateHearts(dt);
+    this.warnGfx.clear();
+    if (this.boss?.brain && this.boss.active) this.boss.brain.draw(this.warnGfx);
     this.updateHud();
 
     if (this.levelUpQueue.length && !this.dead && !this.finished && !this.bossDefeated && !this.scene.isActive('LevelUp')) {
@@ -201,6 +218,7 @@ export default class Game extends Phaser.Scene {
   // Simple bot used for automated tests: chase the lowest enemy, grab chests, dodge shots.
   autoTarget() {
     let best = null;
+    if (this.hp < this.stats.maxHp * 0.7) for (const h of this.liveHearts()) if (h.y > 80) return h.x;
     for (const c of this.liveChests()) if (c.y > 40) return c.x;
     for (const e of this.enemies.getChildren()) {
       if (!e.active || e.dying || e.y < 0) continue;
@@ -209,6 +227,14 @@ export default class Game extends Phaser.Scene {
     let x = best ? best.x : W / 2;
     for (const b of this.enemyBullets.getChildren()) {
       if (b.active && b.y > this.player.y - 120 && b.y < this.player.y && Math.abs(b.x - x) < 22) x += b.x < x ? 40 : -40;
+    }
+    // Step out of boss rain columns and charges.
+    const brain = this.boss?.brain;
+    if (brain) {
+      for (const w of brain.warnings) if (Math.abs(w.x - x) < 30) x += w.x < x ? 50 : -50;
+      if ((brain.state === 'windup' || brain.state === 'dash') && Math.abs(x - brain.target.x) < this.boss.def.radius + 24) {
+        x = brain.target.x + (brain.target.x < W / 2 ? 1 : -1) * (this.boss.def.radius + 40);
+      }
     }
     return Phaser.Math.Clamp(x, 16, W - 16);
   }
@@ -456,10 +482,64 @@ export default class Game extends Phaser.Scene {
     c.setVelocityY(75);
     this.tweens.add({ targets: c, angle: { from: -8, to: 8 }, duration: 400, yoyo: true, repeat: -1 });
     if (rare) this.tweens.add({ targets: c, alpha: 0.6, duration: 200, yoyo: true, repeat: -1 });
+    return c;
   }
 
   liveChests() {
     return this.pickups.getChildren().filter((c) => c.active);
+  }
+
+  // ----- hearts (the only healing during a run) -----
+  liveHearts() {
+    return this.hearts.getChildren().filter((h) => h.active);
+  }
+
+  maybeDropHeart(x, y) {
+    if (this.cd.heart > 0 || this.liveHearts().length >= HEART.maxOnScreen) return;
+    const low = this.hp < this.stats.maxHp * HEART.lowHp ? HEART.lowHpMult : 1;
+    if (Math.random() < HEART.chance * (this.level.heartChance ?? 1) * low) this.dropHeart(x, y);
+  }
+
+  dropHeart(x, y) {
+    const h = this.hearts.create(Phaser.Math.Clamp(x, 20, W - 20), y, 'heart').setScale(HEART.scale).setDepth(6);
+    h.setVelocityY(HEART.fall);
+    h.sparkT = 0;
+    this.tweens.add({ targets: h, scale: HEART.scale * 1.15, duration: 280, yoyo: true, repeat: -1 });
+    this.tweens.add({ targets: h, angle: { from: -8, to: 8 }, duration: 450, yoyo: true, repeat: -1 });
+    this.cd.heart = HEART.cooldown;
+    this.heartStats.dropped += 1;
+    return h;
+  }
+
+  updateHearts(dt) {
+    this.cd.heart -= dt;
+    for (const h of this.liveHearts()) {
+      h.sparkT -= dt;
+      if (h.sparkT <= 0) {
+        h.sparkT = 0.25;
+        this.burst(h.x, h.y, 0xff77a8, 1);
+      }
+      if (h.y > WALL_Y + 12) {
+        h.setActive(false);
+        h.body.enable = false;
+        this.tweens.add({ targets: h, alpha: 0, duration: 200, onComplete: () => h.destroy() });
+      }
+    }
+  }
+
+  onHeart(_player, h) {
+    if (!h.active || this.dead || this.finished) return;
+    h.setActive(false).setVisible(false);
+    h.body.enable = false;
+    this.graveyard.push(h);
+    const amount = Math.max(HEART.minHeal, Math.round(this.stats.maxHp * (this.level.heartHeal ?? HEART.heal)));
+    this.heal(amount);
+    this.heartStats.caught += 1;
+    this.floatText(this.player.x, this.player.y - 24, `+${amount}`, '#ff77a8');
+    this.burst(h.x, h.y, 0xff77a8, 16);
+    sfx.heal();
+    this.player.setTint(0x7dff7a);
+    this.time.delayedCall(80, () => this.player.clearTint());
   }
 
   onBulletHitChest(b, c) {
@@ -507,10 +587,11 @@ export default class Game extends Phaser.Scene {
   // ======================================================================
   spawnEnemy(type, x, y, hpMult) {
     const def = ENEMIES[type];
-    const e = animate(this.physics.add.sprite(x, y, def.tex).setScale(SPRITE_SCALE).setDepth(5));
+    const scale = def.scale ?? SPRITE_SCALE;
+    const e = animate(this.physics.add.sprite(x, y, def.tex).setScale(scale).setDepth(5));
     this.enemies.add(e);
-    const r = def.radius / SPRITE_SCALE; // hitbox from the data, not the picture
-    e.body.setCircle(r, e.width / 2 - r, e.height / 2 - r);
+    const r = def.radius / scale; // hitbox from the data, not the picture
+    e.body.setCircle(r, e.width / 2 - r, e.height / 2 - r + (def.bodyDy ?? 0));
     e.def = def;
     e.type = type;
     // def.hits: dies after that many hits, whatever the damage.
@@ -528,8 +609,11 @@ export default class Game extends Phaser.Scene {
     this.spawner.alive += 1;
     if (def.boss) {
       this.boss = e;
+      e.brain = new BossBrain(this, e);
+      this.bossStart = this.runTime;
       sfx.boss();
       this.cameras.main.shake(500, 0.008);
+      this.toast(def.name.toUpperCase(), '#ffb0cc');
     }
     return e;
   }
@@ -553,7 +637,7 @@ export default class Game extends Phaser.Scene {
     let best = null;
     let bd = Infinity;
     for (const e of this.liveEnemies()) {
-      if (exclude && exclude.has(e)) continue;
+      if ((exclude && exclude.has(e)) || e.phased) continue;
       const d = Phaser.Math.Distance.Squared(x, y, e.x, e.y);
       if (d < bd) { bd = d; best = e; }
     }
@@ -571,17 +655,23 @@ export default class Game extends Phaser.Scene {
       e.orbitHitT -= dt;
       if (e.flashT > 0) {
         e.flashT -= dt;
-        if (e.flashT <= 0) e.clearTint();
+        if (e.flashT <= 0) {
+          if (e.enraged) e.setTint(0xff9090);
+          else e.clearTint();
+        }
       }
       if (e.knock > 0) {
         e.y -= e.knock * dt;
         e.knock = Math.max(0, e.knock - 400 * dt);
       }
+      if (e.brain) {
+        e.brain.update(dt); // bosses: see systems/BossBrain.js
+        continue;
+      }
       if (e.holdY !== null && e.y >= e.holdY) {
         e.holdT += dt;
-        const amp = def.boss ? 110 : 40;
-        e.x = Phaser.Math.Clamp(e.baseX + Math.sin(e.t * (def.boss ? 0.7 : 1.3)) * amp, 30, W - 30);
-        if (!def.boss && e.holdT > 10) e.holdY = null; // shooters eventually advance
+        e.x = Phaser.Math.Clamp(e.baseX + Math.sin(e.t * 1.3) * 40, 30, W - 30);
+        if (e.holdT > 10) e.holdY = null; // shooters eventually advance
       } else {
         e.y += e.speed * dt;
         if (def.wobble) e.x = Phaser.Math.Clamp(e.baseX + Math.sin(e.t * (def.wobbleSpeed ?? 3)) * def.wobble, 12, W - 12);
@@ -589,7 +679,7 @@ export default class Game extends Phaser.Scene {
       if (def.shoot) {
         e.shootT -= dt;
         if (e.shootT <= 0 && e.y > 30) {
-          e.shootT = def.shoot.every * (def.boss && e.hp < e.maxHp / 2 ? 0.6 : 1);
+          e.shootT = def.shoot.every;
           this.enemyShoot(e);
         }
       }
@@ -617,22 +707,28 @@ export default class Game extends Phaser.Scene {
     const spread = ((sh.spread || 0) * Math.PI) / 180;
     for (let i = 0; i < n; i++) {
       const a = n > 1 ? base - spread / 2 + (spread * i) / (n - 1) : base;
-      const b = this.enemyBullets.get(e.x, e.y + 10, sh.tex || 'bone');
-      if (!b) return;
-      b.enableBody(true, e.x, e.y + 10, true, true);
-      b.setScale(2).setDepth(6);
-      b.anims.stop(); // pooled shots are shared by skeletons (bones) and the dragon (fireballs)
-      b.setTexture(sh.tex || 'bone');
-      animate(b);
-      const br = Math.min(b.width, b.height) * 0.35;
-      b.body.setCircle(br, b.width / 2 - br, b.height / 2 - br);
-      this.physics.velocityFromRotation(a, sh.speed, b.body.velocity);
-      b.damage = this.enemyShotDamage(sh.dmg);
+      if (!this.spawnShot(e.x, e.y + 10, a, sh.speed, sh.dmg, sh.tex)) return;
     }
   }
 
+  // One monster shot (angle in radians). Returns null when the shot pool is full.
+  spawnShot(x, y, angle, speed, dmgBase, tex = 'bone', scale = 2) {
+    const b = this.enemyBullets.get(x, y, tex);
+    if (!b) return null;
+    b.enableBody(true, x, y, true, true);
+    b.setScale(scale).setDepth(6);
+    b.anims.stop(); // pooled shots are shared by every shooter (bones, fireballs, ...)
+    b.setTexture(tex);
+    animate(b);
+    const br = Math.min(b.width, b.height) * 0.35;
+    b.body.setCircle(br, b.width / 2 - br, b.height / 2 - br);
+    this.physics.velocityFromRotation(angle, speed, b.body.velocity);
+    b.damage = this.enemyShotDamage(dmgBase);
+    return b;
+  }
+
   onBulletHit(b, e) {
-    if (!b.active || !e.active || e.dying || b.hit.has(e)) return;
+    if (!b.active || !e.active || e.dying || e.phased || b.hit.has(e)) return;
     b.hit.add(e);
     this.damageEnemy(e, b.damage, true);
     if (b.ricochet > 0) {
@@ -653,7 +749,7 @@ export default class Game extends Phaser.Scene {
   }
 
   damageEnemy(e, dmg, canCrit) {
-    if (e.dying) return;
+    if (e.dying || e.phased) return; // a blinking boss can't be hit
     if (e.def.oneHit) dmg = e.hp; // germs pop in one hit
     else if (e.def.hits) dmg = 1; // counts hits, not damage
     else if (canCrit && Math.random() < this.stats.crit) {
@@ -671,12 +767,14 @@ export default class Game extends Phaser.Scene {
     e.dying = true;
     const def = e.def;
     this.kills += 1;
-    this.coinsEarned += def.coins;
+    this.coinsEarned += def.coins * (this.level.coinMult ?? 1);
     if (def.boss) {
       // The level ends with the boss: from here on kills only pay coins (no XP, chests or level-ups).
       this.bossDefeated = true;
+      e.brain?.clear();
+      this.warnGfx.clear();
       this.levelUpQueue.length = 0;
-      for (const c of this.pickups.getChildren()) {
+      for (const c of [...this.pickups.getChildren(), ...this.hearts.getChildren()]) {
         c.setActive(false).setVisible(false);
         c.body.enable = false;
         this.graveyard.push(c);
@@ -691,6 +789,7 @@ export default class Game extends Phaser.Scene {
       }
     }
     if (def.chest && !this.bossDefeated) this.dropChest(e.x, e.y, Math.random() < 0.1);
+    else if (!def.boss && !this.bossDefeated) this.maybeDropHeart(e.x, e.y);
     this.removeEnemy(e);
     if (def.boss) {
       this.boss = null;
@@ -715,10 +814,11 @@ export default class Game extends Phaser.Scene {
   // ======================================================================
   // Touching a monster hurts: it bursts against the guard's armour (the boss just hurts).
   onPlayerTouchEnemy(_p, e) {
-    if (!e.active || e.dying || this.invuln > 0 || this.dead || this.finished) return;
+    if (!e.active || e.dying || e.phased || this.invuln > 0 || this.dead || this.finished) return;
     const dmg = this.enemyDamage(e.def.dmg);
     if (e.def.boss) {
-      this.hurtPlayer(dmg * 0.5);
+      // Bosses aren't destroyed by touching the guard; a charging boss hits full force.
+      this.hurtPlayer(dmg * (e.brain?.state === 'dash' ? 1 : 0.5));
       this.invuln = Math.max(this.invuln, 1);
       return;
     }
@@ -753,13 +853,31 @@ export default class Game extends Phaser.Scene {
   }
 
   // Called by the spawner when a wave starts, with the enemy types it will spawn.
-  // Level-ups happen at fixed shares of the wave's total XP: two in wave 1, then one per wave.
+  // Wave 1: two level-ups at fixed shares of its XP. Later waves: a level-up costs
+  // LEVEL_UPS.need x the wave's XP, and progress towards it carries over (up to `carry`).
   startWaveXp(wave, types) {
     const total = types.reduce((a, t) => a + xpOf(t), 0);
-    const shares = wave === 1 ? LEVEL_UPS.first : LEVEL_UPS.other;
-    this.xpSteps = shares.map((f) => Math.max(1, Math.round(total * f)));
+    if (wave === 1 || !this.xpSteps.length) {
+      this.xpSteps = LEVEL_UPS.first.map((f) => Math.max(1, Math.round(total * f)));
+      this.xpStep = 0;
+      this.waveXp = 0;
+      return;
+    }
+    const carried = Math.min(LEVEL_UPS.carry, this.stepProgress());
+    const need = Math.max(1, Math.round(total * LEVEL_UPS.need));
+    this.xpSteps = [need, 2 * need];
     this.xpStep = 0;
-    this.waveXp = 0;
+    this.waveXp = carried * need;
+  }
+
+  // Progress towards the next level-up (can be above 1 past the last step of the wave).
+  stepProgress() {
+    const s = this.xpSteps;
+    if (!s.length) return 0;
+    const i = Math.min(this.xpStep, s.length - 1);
+    const from = this.xpStep >= s.length ? s[s.length - 1] : i ? s[i - 1] : 0;
+    const to = this.xpStep >= s.length ? 2 * s[s.length - 1] - (s.length > 1 ? s[s.length - 2] : 0) : s[i];
+    return Math.max(0, (this.waveXp - from) / Math.max(1, to - from));
   }
 
   gainXp(n) {
@@ -780,10 +898,7 @@ export default class Game extends Phaser.Scene {
 
   openLevelUp(source) {
     const picks = rollCards(this, this.meta.cards);
-    if (!picks.length) {
-      this.heal(30);
-      return;
-    }
+    if (!picks.length) return; // everything maxed (no healing: only hearts heal)
     if (source === 'chest') sfx.chest();
     else sfx.levelUp();
     this.scene.pause();
@@ -843,6 +958,7 @@ export default class Game extends Phaser.Scene {
   }
 
   revive() {
+    this.boss?.brain?.clear();
     this.hp = Math.round(this.stats.maxHp * 0.6);
     for (const b of this.enemyBullets.getChildren()) if (b.active) b.disableBody(true, true);
     for (const e of this.liveEnemies()) {
@@ -863,19 +979,28 @@ export default class Game extends Phaser.Scene {
   finish(victory) {
     if (this.finished) return;
     this.finished = true;
+    this.boss?.brain?.clear();
+    this.warnGfx.clear();
     this.physics.pause();
     this.laserGfx.clear();
-    const hpFrac = this.hp / this.stats.maxHp;
+    const hpFrac = Math.min(1, this.hp / this.startMaxHp);
+    // Nightmare pays its big gem reward on the first clear only.
+    const firstClear = !(Save.progress(this.mode).stars[this.level.n] > 0);
+    const gems = this.level.firstGems && firstClear ? this.level.firstGems : this.level.clearGems;
     const result = {
       level: this.level.n,
+      mode: this.mode,
       victory,
       coins: Math.round((this.coinsEarned + (victory ? this.level.clearCoins : 0)) * this.stats.coinMult),
-      gems: victory ? this.level.clearGems : 0,
+      gems: victory ? gems : 0,
       stars: victory ? (this.adReviveUsed ? 1 : hpFrac >= 0.8 ? 3 : hpFrac >= 0.4 ? 2 : 1) : 0,
       kills: this.kills,
       wave: this.spawner.wave,
       waves: this.level.waves,
       runLevel: this.runLevel,
+      hearts: this.heartStats,
+      bossTime: this.bossStart ? Math.round(this.runTime - this.bossStart) : 0,
+      hpLeft: Math.round(this.hp),
     };
     window.__lastResult = result;
     if (victory) sfx.win();
@@ -923,15 +1048,18 @@ export default class Game extends Phaser.Scene {
     const waveDone = this.xpStep >= this.xpSteps.length;
     g.fillStyle(waveDone ? 0x5a4a80 : 0x9d74ff, 1).fillRect(1, 31, (W - 2) * this.xpProgress(), 7);
     this.hpText.setText(`${Math.ceil(this.hp)}/${Math.round(this.stats.maxHp)}`);
-    this.waveText.setText(`WAVE ${this.spawner.wave}/${this.level.waves}`);
+    this.waveText.setText(`${this.mode === 'nightmare' ? 'NM ' : ''}WAVE ${this.spawner.wave}/${this.level.waves}`);
     this.coinText.setText(String(Math.round(this.coinsEarned * this.stats.coinMult)));
     this.lvlText.setText(`LV ${this.runLevel}`);
 
     const bg = this.barGfx;
     bg.clear();
     if (this.boss && this.boss.active) {
+      const brain = this.boss.brain;
       g.fillStyle(0x000000, 1).fillRect(38, 56, W - 76, 14);
-      g.fillStyle(0x56b53a, 1).fillRect(40, 58, ((W - 80) * Math.max(0, this.boss.hp)) / this.boss.maxHp, 10);
+      g.fillStyle(brain?.phase === 2 ? 0xd8283c : 0x56b53a, 1).fillRect(40, 58, ((W - 80) * Math.max(0, this.boss.hp)) / this.boss.maxHp, 10);
+      // Where it gets angry (phase 2).
+      if (brain?.phase === 1) g.fillStyle(0xffffff, 0.9).fillRect(40 + (W - 80) * brain.phase2At - 1, 56, 2, 14);
       this.bossText.setText(this.boss.def.name.toUpperCase());
     } else this.bossText.setText('');
     for (const c of this.liveChests()) {

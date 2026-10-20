@@ -16,6 +16,35 @@ const LEVEL_DEFS = [
   { name: 'Graveyard', bg: { base: '#1e1a24', dark: '#16131b', light: '#3a3446', deco: 'bones' } },
   { name: 'Castle Ruins', bg: { base: '#22222a', dark: '#1a1a21', light: '#3c3c4a', deco: 'bricks' } },
   { name: 'Dark Realm', bg: { base: '#1a0d26', dark: '#12091b', light: '#4a2a70', deco: 'stars' } },
+  // Monster Lairs: each is full of one kind of monster, ruled by a giant King.
+  {
+    name: 'Slime Bog', boss: 'slimeking', bg: { base: '#132a1c', dark: '#0e2015', light: '#3f8a3a', deco: 'bubbles' },
+    pool: { slime: 8, bigslime: 5, golem: 2, bat: 1, ghost: 1, skeleton: 1 },
+  },
+  {
+    name: 'Bat Caverns', boss: 'batqueen', bg: { base: '#1a1420', dark: '#120d17', light: '#6a2a5a', deco: 'drips' },
+    pool: { bat: 12, slime: 3, skeleton: 2, ghost: 2, golem: 1 }, countMult: 1.2,
+  },
+  {
+    name: 'Haunted Halls', boss: 'ghostlord', bg: { base: '#161a24', dark: '#10131b', light: '#4a5a78', deco: 'webs' },
+    pool: { ghost: 10, bat: 2, skeleton: 2, slime: 2 }, extraHits: 1,
+  },
+  {
+    name: 'Stone Quarry', boss: 'golemtitan', bg: { base: '#2a2620', dark: '#201d18', light: '#6a6050', deco: 'rubble' },
+    pool: { golem: 9, slime: 3, skeleton: 2, bigslime: 1 }, countMult: 0.65, intervalMult: 1.2,
+  },
+  {
+    name: 'Bone Crypt', boss: 'skeletonking', bg: { base: '#1c1818', dark: '#141111', light: '#6a5e54', deco: 'skulls' },
+    pool: { skeleton: 8, ghost: 2, bat: 2, golem: 1 }, countMult: 0.75,
+  },
+  {
+    name: 'Ogre Stronghold', boss: 'ogrewarlord', bg: { base: '#24180f', dark: '#1b120b', light: '#6a4422', deco: 'bricks' },
+    pool: { brute: 8, golem: 2, skeleton: 2, slime: 1 }, countMult: 0.7,
+  },
+  {
+    name: "Dragon's Peak", boss: 'elderdragon', bg: { base: '#2a0a12', dark: '#1e070d', light: '#9a3020', deco: 'embers' },
+    pool: { whelp: 8, skeleton: 2, bat: 2, golem: 1 }, countMult: 0.85, gems: 25,
+  },
 ];
 
 // How much tougher each level's monsters are (health): +12% per level up to level 6, then
@@ -47,7 +76,7 @@ export const LEVELS = LEVEL_DEFS.map((d, i) => {
     boss: d.boss ?? BOSS, // the last wave is always this boss
     waves: Math.min(12, 8 + Math.floor(n / 3)),
     hpMult: hp,
-    bossHpMult: hp,
+    bossHpMult: hp * (1 + 0.04 * (n - 1)), // bosses get tougher faster than their minions
     speedMult: Math.min(1.4, 1 + 0.03 * i),
     dmgMult: 1 + 0.07 * i,
     // Aimed shots grow more slowly (+5% per level): several shooters fire at once.
@@ -57,15 +86,79 @@ export const LEVELS = LEVEL_DEFS.map((d, i) => {
     intervalMult: d.intervalMult ?? 1,
     extraHits: d.extraHits ?? 0, // ghosts take this many more hits
     clearCoins: 40 + 30 * n,
-    clearGems: d.gems ?? (n % 3 === 0 ? 10 : 3),
+    clearGems: d.gems ?? (n % 3 === 0 ? 10 : n > 10 ? 5 : 3),
   };
 });
 
-// A level by number (clamped to the existing levels).
-export function getLevel(n) {
+// Nightmare mode: hard versions of every level, bought once for 5000 coins after beating
+// level 10. Monsters don't adapt to shop upgrades here, so every upgrade counts in full –
+// the later Nightmare levels need an (almost) fully upgraded shop. k = level number.
+export const NIGHTMARE = {
+  cost: 5000,
+  requires: 10, // beat this normal level first
+  hp: (k) => 3.6 + 0.22 * (k - 1),
+  bossHp: (k) => (3.6 + 0.22 * (k - 1)) * (1 + 0.04 * (k - 1)),
+  dmg: (k) => 2.6 + 0.08 * (k - 1),
+  shot: (k) => 2.0 + 0.06 * (k - 1),
+  speed: 1.12,
+  speedCap: 1.55,
+  count: 1.15, // more monsters per wave
+  interval: 0.85, // spawning faster
+  minInterval: 0.24,
+  extraHits: 1, // ghosts take one more hit
+  phase2At: 0.6, // bosses get angry sooner...
+  bossCd: 0.85, // ...and attack more often
+  heartChance: 0.75,
+  heartHeal: 0.12,
+  coinMult: 2, // kill coins
+  clearCoins: (k) => 500 + 100 * k,
+  firstGems: (k) => 20 + 5 * Math.floor((k - 1) / 4), // first clear
+  gems: 4, // replays
+};
+
+// Mix a #rrggbb colour towards another (t = 0..1).
+const mix = (a, b, t) => '#' + [1, 3, 5].map((i) => {
+  const v = Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t);
+  return v.toString(16).padStart(2, '0');
+}).join('');
+
+const NIGHTMARE_LEVELS = LEVELS.map((L) => {
+  const k = L.n;
+  const N = NIGHTMARE;
+  return {
+    ...L,
+    mode: 'nightmare',
+    bgKey: `bg_${k}_nm`,
+    bg: { ...L.bg, base: mix(L.bg.base, '#1a0008', 0.5), dark: mix(L.bg.dark, '#1a0008', 0.5), light: mix(L.bg.light, '#b0103a', 0.45) },
+    hpMult: N.hp(k),
+    bossHpMult: N.bossHp(k),
+    dmgMult: N.dmg(k),
+    shotMult: N.shot(k),
+    speedMult: Math.min(N.speedCap, L.speedMult * N.speed),
+    countMult: L.countMult * N.count,
+    intervalMult: L.intervalMult * N.interval,
+    minInterval: N.minInterval,
+    extraHits: L.extraHits + N.extraHits,
+    phase2At: N.phase2At,
+    bossCd: N.bossCd,
+    heartChance: N.heartChance,
+    heartHeal: N.heartHeal,
+    coinMult: N.coinMult,
+    noAdapt: true,
+    clearCoins: N.clearCoins(k),
+    clearGems: N.gems,
+    firstGems: N.firstGems(k),
+  };
+});
+
+// A level by number (clamped to the existing levels) and mode ('normal' or 'nightmare').
+export function getLevel(n, mode = 'normal') {
   const i = Math.min(LEVELS.length, Math.max(1, Math.floor(Number(n)) || 1)) - 1;
-  return LEVELS[i];
+  return mode === 'nightmare' ? NIGHTMARE_LEVELS[i] : LEVELS[i];
 }
+
+// Every level of both modes (e.g. to create the ground textures).
+export const ALL_LEVELS = [...LEVELS, ...NIGHTMARE_LEVELS];
 
 // Enemies per wave and spawn rhythm. Waves get longer and faster.
 export function waveSpec(level, wave) {
@@ -78,6 +171,7 @@ export function waveSpec(level, wave) {
   };
 }
 
-// Level-ups per wave: when this share of the wave's total XP has been collected.
-// Wave 1 gives two level-ups, every later wave one. Unused XP doesn't carry over.
-export const LEVEL_UPS = { first: [0.35, 0.75], other: [0.75] };
+// Level-ups. Wave 1 gives two (at these shares of its XP). After that a level-up costs
+// `need` times a wave's XP, so not every wave gives one; progress carries over to the next
+// wave, up to `carry` of a level-up. The shop's Fast Learner (more XP) buys level-ups back.
+export const LEVEL_UPS = { first: [0.4, 0.9], need: 1.5, carry: 0.75 };

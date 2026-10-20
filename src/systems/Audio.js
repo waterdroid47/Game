@@ -46,6 +46,7 @@ export const sfx = {
   missile: () => tone(500, 0.15, 'triangle', 0.03, 300),
   boom: () => tone(90, 0.25, 'sawtooth', 0.07, -40),
   coin: () => { tone(988, 0.07, 'square', 0.04); tone(1318, 0.12, 'square', 0.04, 0, 0.07); },
+  heal: () => [659, 880, 1175].forEach((f, i) => tone(f, 0.09, 'sine', 0.08, 0, i * 0.05)),
   chest: () => [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.12, 'square', 0.05, 0, i * 0.07)),
   levelUp: () => [392, 523, 659, 784].forEach((f, i) => tone(f, 0.1, 'triangle', 0.07, 0, i * 0.06)),
   click: () => tone(660, 0.05, 'square', 0.04),

@@ -75,7 +75,8 @@ export const CARDS = [
   { id: 'crit', name: 'Critical Hit', icon: 'ic_crit', color: 0xffd23f, max: 5, desc: (s) => `Crit chance ${arrow(pct(s.crit), pct(s.crit + 0.1))} (double damage)`, apply: (s) => { s.crit += 0.1; } },
   { id: 'ricochet', name: 'Ricochet', icon: 'ic_ricochet', color: 0xb0ff6a, max: 3, desc: (s) => `Shots bounce to ${arrow(s.ricochet, s.ricochet + 1)} more monsters`, apply: (s) => { s.ricochet += 1; } },
   { id: 'size', name: 'Heavy Bolts', icon: 'ic_size', color: 0xffa04d, max: 3, desc: (s) => `Bigger shots, damage ${arrow(f1(s.damage), f1(s.damage * 1.1))}`, apply: (s) => { s.bulletScale *= 1.25; s.damage *= 1.1; } },
-  { id: 'hp', name: 'Healing Potion', icon: 'ic_hp', color: 0xff3b5c, desc: (s) => `Max HP ${arrow(Math.round(s.maxHp), Math.round(s.maxHp + 20))}, heal 40`, apply: (s, run) => { s.maxHp += 20; run.heal(40); } },
+  // More max HP, but no healing: during a run only hearts heal.
+  { id: 'hp', name: 'Iron Heart', icon: 'ic_hp', color: 0xff3b5c, desc: (s) => `Max HP ${arrow(Math.round(s.maxHp), Math.round(s.maxHp + 20))}`, apply: (s) => { s.maxHp += 20; } },
   { id: 'speed', name: 'Swift Bolts', icon: 'ic_speed', color: 0xc0c0ff, max: 2, desc: (s) => `Shot speed +25%, shots per second ${arrow(f1(s.fireRate), f1(s.fireRate * 1.1))}`, apply: (s) => { s.bulletSpeed *= 1.25; s.fireRate *= 1.1; } },
 ];
 
