@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { AUTOPLAY, DEBUG, H, WALL_Y, MOVE_TOP, PLAYER_Y, SPEED, SPRITE_SCALE, W } from '../config.js';
 import { ENEMIES } from '../data/enemies.js';
-import { LEVELS, LEVEL_UPS } from '../data/levels.js';
+import { LEVEL_UPS, getLevel } from '../data/levels.js';
 import { enemyAdapt, metaStats } from '../data/shop.js';
 import { CARDS, STANCES, STANCE_MAX, STANCE_STATS, canTake, rollCards } from '../data/upgrades.js';
 import { Monetization } from '../services/monetization.js';
@@ -18,11 +18,6 @@ const xpOf = (type) => {
   const d = ENEMIES[type];
   return d.xp + (d.split ? d.split.count * xpOf(d.split.into) : 0);
 };
-// Burst colour when a monster is defeated.
-const ENEMY_COLORS = {
-  slime: 0x00e436, bat: 0x7e2553, golem: 0xc2c3c7, bigslime: 0x83769c, minislime: 0x83769c,
-  skeleton: 0xfff1e8, ogre: 0x008751, dragon: 0xff004d, ghost: 0xfff1e8,
-};
 
 export default class Game extends Phaser.Scene {
   constructor() {
@@ -30,7 +25,7 @@ export default class Game extends Phaser.Scene {
   }
 
   init(data) {
-    this.level = LEVELS[Phaser.Math.Clamp((data && data.level) || 1, 1, LEVELS.length) - 1];
+    this.level = getLevel(data?.level);
   }
 
   create() {
@@ -38,7 +33,7 @@ export default class Game extends Phaser.Scene {
     this.tweens.timeScale = SPEED;
     this.physics.world.timeScale = 1 / SPEED;
 
-    this.bg = this.add.tileSprite(0, 0, W, H, `bg_${this.level.n}`).setOrigin(0);
+    this.bg = this.add.tileSprite(0, 0, W, H, this.level.bgKey).setOrigin(0);
     // The castle wall the guard defends (monsters that reach it hurt the guard).
     this.add.tileSprite(0, WALL_Y - 4, W, 24, 'wall').setOrigin(0, 0).setTileScale(2, 2).setDepth(2);
     this.add.rectangle(0, WALL_Y + 20, W, H - WALL_Y - 20, 0x2b2733).setOrigin(0).setDepth(2);
@@ -519,7 +514,7 @@ export default class Game extends Phaser.Scene {
     e.def = def;
     e.type = type;
     // def.hits: dies after that many hits, whatever the damage.
-    e.maxHp = e.hp = def.hits ? def.hits : (def.boss ? def.hp * this.level.hpMult : def.hp * hpMult) * this.adapt.hp;
+    e.maxHp = e.hp = def.hits ? def.hits + this.level.extraHits : (def.boss ? def.hp * this.level.bossHpMult : def.hp * hpMult) * this.adapt.hp;
     e.speed = def.speed * this.level.speedMult * Phaser.Math.FloatBetween(0.9, 1.1);
     e.baseX = def.boss ? W / 2 : def.wobble ? Phaser.Math.Clamp(x, 24 + def.wobble, W - 24 - def.wobble) : x;
     e.t = Math.random() * 10;
@@ -544,10 +539,10 @@ export default class Game extends Phaser.Scene {
     return base * this.level.dmgMult * this.adapt.dmg;
   }
 
-  // Aimed shots grow more slowly (+5% per level, half the adaptation): several shooters
+  // Aimed shots grow more slowly (level.shotMult, half the adaptation): several shooters
   // fire at once, so full scaling made later levels a wall.
   enemyShotDamage(base) {
-    return base * (1 + 0.05 * (this.level.n - 1)) * (1 + 0.5 * (this.adapt.dmg - 1));
+    return base * this.level.shotMult * (1 + 0.5 * (this.adapt.dmg - 1));
   }
 
   liveEnemies() {
@@ -688,7 +683,7 @@ export default class Game extends Phaser.Scene {
       }
     }
     if (!this.bossDefeated) this.gainXp(def.xp);
-    this.burst(e.x, e.y, ENEMY_COLORS[e.type] ?? 0xffffff, def.boss ? 80 : 12);
+    this.burst(e.x, e.y, def.color ?? 0xffffff, def.boss ? 80 : 12);
     sfx.kill();
     if (def.split && !this.bossDefeated) {
       for (let i = 0; i < def.split.count; i++) {
@@ -727,7 +722,7 @@ export default class Game extends Phaser.Scene {
       this.invuln = Math.max(this.invuln, 1);
       return;
     }
-    this.burst(e.x, e.y, ENEMY_COLORS[e.type] ?? 0xffffff, 10);
+    this.burst(e.x, e.y, e.def.color ?? 0xffffff, 10);
     this.removeEnemy(e);
     this.hurtPlayer(dmg);
   }

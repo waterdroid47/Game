@@ -104,7 +104,7 @@ export function createTextures(scene, levels = []) {
   for (const [key, rows] of Object.entries(ICONS)) drawMono(scene, key, rows);
   drawMono(scene, 'px', ['ww', 'ww']);
   drawBackground(scene, 'bg', { base: '#1a1622', dark: '#141019', light: '#241e2e', deco: 'bricks' });
-  for (const lvl of levels) drawBackground(scene, `bg_${lvl.n}`, lvl.bg);
+  for (const lvl of levels) drawBackground(scene, lvl.bgKey, lvl.bg);
 }
 
 // Plays a sprite's animation (if it has one), starting on a random frame so a crowd of
