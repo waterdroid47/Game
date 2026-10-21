@@ -109,12 +109,12 @@ export const ENEMIES = {
     holdY: 150, sway: [95, 0.6],
     attacks: [
       { type: 'fan', every: 1.8, count: 7, spread: 80, speed: 160, dmg: 10, tex: 'darkfire' },
-      { type: 'rain', every: 6, count: 5, warn: 0.9, speed: 400, dmg: 12, tex: 'darkfire', p2: { count: 7 } },
+      { type: 'rain', every: 6, count: 5, warn: 0.9, speed: 400, dmg: 12, tex: 'darkfire', p2: { count: 6 } },
       { type: 'summon', every: 6, enemy: 'whelp', count: 2 },
-      { type: 'ring', phase: 2, every: 3, count: 16, turn: 11, speed: 120, dmg: 10, tex: 'darkfire' },
-      { type: 'charge', phase: 2, every: 7, warn: 1, speed: 340 }, // dive
+      { type: 'ring', phase: 2, every: 3.6, count: 16, turn: 11, speed: 120, dmg: 10, tex: 'darkfire' },
+      { type: 'charge', phase: 2, every: 8, warn: 1, speed: 340 }, // dive
     ],
-    phase2: { at: 0.5, cd: 0.65, toast: 'The Elder Dragon awakens!' },
+    phase2: { at: 0.5, cd: 0.7, toast: 'The Elder Dragon awakens!' },
   },
 };
 
