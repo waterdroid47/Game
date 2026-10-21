@@ -7,6 +7,7 @@ import hero from './sprites/hero.js';
 import items from './sprites/items.js';
 import monsters1 from './sprites/monsters1.js';
 import monsters2 from './sprites/monsters2.js';
+import { VARIANTS, buildVariant } from './variants.js';
 
 export const SPRITE_GROUPS = { hero, items, monsters1, monsters2 };
 
@@ -73,6 +74,11 @@ function drawBackground(scene, key, bg) {
     bones: (x, y) => { px(x, y, light); px(x + 1, y, light); px(x + 2, y, light); px(x, y + 1, dark); px(x + 2, y + 1, dark); },
     bricks: (x, y) => { for (let i = 0; i < 5; i++) px(x + i, y, dark); px(x, y - 1, dark); px(x + 4, y + 1, dark); },
     stars: (x, y) => { px(x, y, light); },
+    drips: (x, y) => { px(x, y, light); px(x, y + 1, light); px(x, y + 2, dark); px(x + 3, y + 1, dark); },
+    webs: (x, y) => { for (let i = -2; i <= 2; i++) { px(x + i, y + i, dark); px(x + i, y - i, dark); } px(x, y, light); },
+    rubble: (x, y) => { px(x, y, light); px(x + 1, y, light); px(x, y + 1, dark); px(x + 1, y + 1, dark); px(x + 3, y + 1, light); },
+    skulls: (x, y) => { px(x, y, light); px(x + 1, y, light); px(x + 2, y, light); px(x, y + 1, dark); px(x + 2, y + 1, dark); px(x + 1, y + 2, light); },
+    embers: (x, y) => { px(x, y, light); px(x + 1, y - 1, dark); px(x - 2, y + 2, light); },
     dots: (x, y) => { px(x, y, light); },
   };
   const drawShape = shapes[deco] || shapes.dots;
@@ -87,24 +93,28 @@ function drawMono(scene, key, rows, colour = '#ffffff') {
   drawSprite(scene, key, [rows.map((r) => r.replace(/w/g, '7'))], { 7: colour });
 }
 
-export function createTextures(scene, levels = []) {
-  for (const group of Object.values(SPRITE_GROUPS)) {
-    for (const [key, sp] of Object.entries(group)) {
-      drawSprite(scene, key, sp.frames);
-      if (sp.frames.length > 1 && !scene.anims.exists(`${key}-anim`)) {
-        scene.anims.create({
-          key: `${key}-anim`,
-          frames: sp.frames.map((_, i) => ({ key, frame: i })),
-          frameRate: sp.fps || 4,
-          repeat: -1,
-        });
-      }
-    }
+// One sprite texture, plus its animation if it has several frames.
+function addSprite(scene, key, frames, fps) {
+  drawSprite(scene, key, frames);
+  if (frames.length > 1 && !scene.anims.exists(`${key}-anim`)) {
+    scene.anims.create({
+      key: `${key}-anim`,
+      frames: frames.map((_, i) => ({ key, frame: i })),
+      frameRate: fps || 4,
+      repeat: -1,
+    });
   }
+}
+
+export function createTextures(scene, levels = []) {
+  const all = Object.assign({}, ...Object.values(SPRITE_GROUPS));
+  for (const [key, sp] of Object.entries(all)) addSprite(scene, key, sp.frames, sp.fps);
+  // Kings, brute, whelp, boss projectiles: recoloured / crowned versions of the sprites above.
+  for (const [key, v] of Object.entries(VARIANTS)) addSprite(scene, key, buildVariant(all[v.base].frames, v), all[v.base].fps);
   for (const [key, rows] of Object.entries(ICONS)) drawMono(scene, key, rows);
   drawMono(scene, 'px', ['ww', 'ww']);
   drawBackground(scene, 'bg', { base: '#1a1622', dark: '#141019', light: '#241e2e', deco: 'bricks' });
-  for (const lvl of levels) drawBackground(scene, `bg_${lvl.n}`, lvl.bg);
+  for (const lvl of levels) drawBackground(scene, lvl.bgKey, lvl.bg);
 }
 
 // Plays a sprite's animation (if it has one), starting on a random frame so a crowd of

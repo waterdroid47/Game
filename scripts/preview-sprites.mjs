@@ -29,6 +29,20 @@ for (const f of files) {
   }
 }
 
+// Variants (Kings, brute, whelp, projectiles) are built from the sprites above.
+if (!only.length || only.includes('variants')) {
+  const { VARIANTS, buildVariant } = await import('../src/art/variants.js');
+  // Bases can be in any sprite file, also ones not shown on this sheet.
+  const allSprites = {};
+  for (const f of readdirSync(dir).filter((x) => x.endsWith('.js'))) Object.assign(allSprites, (await import(new URL(f, dir))).default);
+  for (const [key, v] of Object.entries(VARIANTS)) {
+    const base = allSprites[v.base];
+    if (!base) { errors.push(`variant ${key}: unknown base ${v.base}`); continue; }
+    const frames = buildVariant(base.frames, v);
+    sprites.push({ group: 'variants', key, w: frames[0][0].length, h: frames[0].length, frames });
+  }
+}
+
 const S = 6; // preview scale
 const PAD = 8;
 const MAXW = 1400;

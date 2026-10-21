@@ -5,13 +5,23 @@ A pixel-art monster defense shooter for phones, built with [Phaser 3](https://ph
 You are a little pixel guard holding the castle gate. Slide your finger to move: left and right, and up and down in the lower part of the screen to dodge the dragon's fireballs. You shoot automatically, and touching a monster hurts. Waves of monsters get stronger every wave.
 - **Monsters:**
   - slimes and slow stone golems from level 1;
-  - big slimes that split, and ghosts that sway slowly and always take 3 hits, from level 3;
+  - big slimes that split, and ghosts that sway slowly and take 3 hits (more in Haunted Halls and in Nightmare), from level 3;
   - fast bats that pop in one hit, and skeleton archers that shoot bones, from level 4;
-  - an Ogre King (drops a treasure chest) and the Red Dragon boss in every level.
-- **Level-ups:** kill monsters to level up: twice in the first wave, then once per wave. Pick 1 of 3 upgrades. Each card shows exactly what changes, and maxed-out upgrades are never offered. These are stronger bolts or new **attack stances**: Fire Fan, Lightning Beam, Shield Orbit, Spirit Missiles and Shockwave. Each stance evolves at level 5.
+  - an Ogre King (drops a treasure chest) in later waves;
+  - Ogre Brutes and fire-spitting Dragon Whelps in the Monster Lairs.
+- **Bosses:** the Red Dragon guards levels 1–10. Each Monster Lair has its own giant King: Slime King, Bat Queen, Ghost Lord, Golem Titan, Skeleton King, Ogre Warlord and Elder Dragon. Every boss has its own attacks: fireball fans, rings, meteor rain with red warning columns, charges and teleports. At half health (sooner in Nightmare) it gets **enraged**: it attacks faster and adds new attacks.
+- **Health:** only **hearts** heal. A defeated monster sometimes drops one; it falls slowly and you have to catch it.
+- **Level-ups:** kill monsters to level up. You get two level-ups in the first wave, then one about every wave and a half (Fast Learner in the shop gives more). Pick 1 of 3 upgrades. Each card shows exactly what changes, and maxed-out upgrades are never offered. These are stronger bolts or new **attack stances**: Fire Fan, Lightning Beam, Shield Orbit, Spirit Missiles and Shockwave. Each stance evolves at level 5.
 - **Treasure chests:** catch the ones dropped by the Ogre King, or shoot them open, for extra upgrades.
 - **Rewarded ads:** watch one to revive, double your coins, or reroll the cards. Once per run, an ad can also **TAKE ALL** the cards on a bonus screen. In the Android app, a short skippable ad also plays between some levels; buying anything in the store removes it.
-- **10 levels:** Meadow, Dark Forest, Crystal Cave, Murky Swamp, Scorched Desert, Ice Peaks, Volcano, Graveyard, Castle Ruins and Dark Realm. Monsters get tougher with every wave and every level.
+- **17 levels:**
+  - Meadow, Dark Forest, Crystal Cave, Murky Swamp, Scorched Desert, Ice Peaks, Volcano, Graveyard, Castle Ruins and Dark Realm;
+  - then the 7 Monster Lairs: Slime Bog, Bat Caverns, Haunted Halls, Stone Quarry, Bone Crypt, Ogre Stronghold and Dragon's Peak.
+
+  Monsters get tougher with every wave and every level.
+- **Nightmare mode:** after level 10, spend 5000 coins to unlock hard versions of all levels.
+  - Monsters don't adapt to your upgrades there, so every upgrade counts; the last Nightmare levels need an almost fully upgraded shop.
+  - Coins are doubled, and the first clear of each level gives a big gem reward.
 - **Shop:** between runs, spend **coins** on permanent upgrades. **Gems**, from bosses, ads and the store, buy the strongest ones. Monsters adapt a little to your upgrades.
 
 ## Play / develop
@@ -27,8 +37,9 @@ Controls: drag anywhere on the screen to move (left/right, and up/down in the lo
 Testing URL flags:
 | Flag | Effect |
 |------|--------|
-| `?debug` | All levels unlocked, lots of currency, in-game SKIP / +LVL buttons |
-| `?level=3` | Jump straight into level 3 |
+| `?debug` | All levels and Nightmare unlocked (saved – use RESET to undo), lots of currency, in-game SKIP / +LVL buttons |
+| `?level=3` | Jump straight into level 3 (1–17) |
+| `?nightmare` | With `?level=N`: Nightmare level N |
 | `?autoplay` | A bot plays (used for balance testing) |
 | `?speed=3` | Run the game 3× faster |
 
@@ -41,15 +52,17 @@ src/
   art/palette.js        Shared 16-colour palette
   art/sprites/          Pixel maps: hero (guard, bolts), items, monsters
   art/pixelSprites.js   Turns the pixel maps into textures + animations; level grounds
+  art/variants.js       Kings / brute / whelp built from existing sprites (recolour + crown)
   data/                 Balancing lives here – edit numbers, not code
-    enemies.js          Enemy stats
-    levels.js           10 levels, wave sizes, difficulty curve, XP curve
+    enemies.js          Monster stats, bosses and their attacks
+    pickups.js          Hearts (healing)
+    levels.js           17 levels + Nightmare, wave sizes, difficulty curve, level-ups
     upgrades.js         In-run upgrade cards and attack stances
     shop.js             Permanent upgrades (coins / gems), monster adaptation
     store.js            Real-money packs (Google Play product ids)
     ads.js              AdMob ad unit ids, ads between levels
   scenes/               Boot, Menu, LevelSelect, Shop, Store, Game, LevelUp, Pause, Result
-  systems/              WaveSpawner, SaveSystem (localStorage), Audio (synthesized SFX)
+  systems/              WaveSpawner, BossBrain (boss attacks), SaveSystem (localStorage), Audio
   services/monetization.js   Ads + in-app purchases (AdMob / Google Play; mocked in the browser)
   services/native.js    Android-only setup (Back button, status bar)
 public/                 PWA manifest, service worker, icons, privacy policy

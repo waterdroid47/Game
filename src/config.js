@@ -17,3 +17,5 @@ export const DEBUG = params.has('debug');
 export const AUTOPLAY = params.has('autoplay');
 export const SPEED = Math.max(0.25, Number(params.get('speed')) || 1);
 export const START_LEVEL = Number(params.get('level')) || 0;
+// ?nightmare – with ?level=N, start Nightmare level N (testing)
+export const START_MODE = params.has('nightmare') ? 'nightmare' : 'normal';
