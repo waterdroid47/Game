@@ -20,7 +20,7 @@ export const ENEMIES = {
   brute: { name: 'Ogre Brute', tex: 'brute', hp: 32, speed: 21, dmg: 16, xp: 3, coins: 3, radius: 18, color: 0xab5236 },
   whelp: {
     name: 'Dragon Whelp', tex: 'whelp', hp: 16, speed: 34, dmg: 12, xp: 2, coins: 2, radius: 15, color: 0x00e436,
-    wobble: 35, wobbleSpeed: 2, shoot: { every: 4, speed: 140, dmg: 6, count: 1, tex: 'fireball' },
+    wobble: 35, wobbleSpeed: 2, shoot: { every: 5, speed: 140, dmg: 6, count: 1, tex: 'fireball' },
   },
 
   // ----- Bosses: the last wave of a level (see systems/BossBrain.js) -----

@@ -31,11 +31,11 @@ const LEVEL_DEFS = [
   },
   {
     name: 'Stone Quarry', boss: 'golemtitan', bg: { base: '#2a2620', dark: '#201d18', light: '#6a6050', deco: 'rubble' },
-    pool: { golem: 9, slime: 3, skeleton: 2, bigslime: 1 }, countMult: 0.55, intervalMult: 2.2,
+    pool: { golem: 9, slime: 3, skeleton: 2, bigslime: 1 }, countMult: 0.5, intervalMult: 2.6,
   },
   {
     name: 'Bone Crypt', boss: 'skeletonking', bg: { base: '#1c1818', dark: '#141111', light: '#6a5e54', deco: 'skulls' },
-    pool: { skeleton: 8, ghost: 2, bat: 2, golem: 1 }, countMult: 0.75, intervalMult: 1.3,
+    pool: { skeleton: 8, ghost: 2, bat: 2, golem: 1 }, countMult: 0.75, intervalMult: 1.6,
   },
   {
     name: 'Ogre Stronghold', boss: 'ogrewarlord', bg: { base: '#24180f', dark: '#1b120b', light: '#6a4422', deco: 'bricks' },
@@ -43,7 +43,7 @@ const LEVEL_DEFS = [
   },
   {
     name: "Dragon's Peak", boss: 'elderdragon', bg: { base: '#2a0a12', dark: '#1e070d', light: '#9a3020', deco: 'embers' },
-    pool: { whelp: 8, skeleton: 2, bat: 2, golem: 1 }, countMult: 0.8, intervalMult: 1.7, gems: 25,
+    pool: { whelp: 8, skeleton: 2, bat: 2, golem: 1 }, countMult: 0.8, intervalMult: 2.0, gems: 25,
   },
 ];
 
@@ -78,7 +78,8 @@ export const LEVELS = LEVEL_DEFS.map((d, i) => {
     hpMult: hp,
     bossHpMult: hp * (1 + 0.04 * (n - 1)), // bosses get tougher faster than their minions
     speedMult: Math.min(1.4, 1 + 0.03 * i),
-    dmgMult: 1 + 0.07 * i,
+    // +7% per level up to level 10, then +3%: lair monsters already hit harder by type.
+    dmgMult: i < 10 ? 1 + 0.07 * i : 1.63 + 0.03 * (i - 9),
     // Aimed shots grow more slowly (+5% per level): several shooters fire at once.
     shotMult: 1 + 0.05 * i,
     pool: d.pool ?? poolFor(n),
@@ -96,13 +97,13 @@ export const LEVELS = LEVEL_DEFS.map((d, i) => {
 export const NIGHTMARE = {
   cost: 5000,
   requires: 10, // beat this normal level first
-  hp: (k) => 3.6 + 0.15 * (k - 1),
-  bossHp: (k) => (3.6 + 0.15 * (k - 1)) * (1 + 0.04 * (k - 1)),
-  dmg: (k) => 2.6 + 0.08 * (k - 1),
-  shot: (k) => 2.0 + 0.06 * (k - 1),
+  hp: (k) => 3.0 + 0.16 * (k - 1),
+  bossHp: (k) => (3.0 + 0.16 * (k - 1)) * (1 + 0.04 * (k - 1)),
+  dmg: (k) => 2.2 + 0.06 * (k - 1),
+  shot: (k) => 1.7 + 0.04 * (k - 1),
   speed: 1.12,
   speedCap: 1.55,
-  count: 1.15, // more monsters per wave
+  count: 1.1, // more monsters per wave
   interval: 0.85, // spawning faster
   minInterval: 0.24,
   extraHits: 1, // ghosts take one more hit
