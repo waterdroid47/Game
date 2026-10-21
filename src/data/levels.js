@@ -78,7 +78,8 @@ export const LEVELS = LEVEL_DEFS.map((d, i) => {
     hpMult: hp,
     bossHpMult: hp * (1 + 0.04 * (n - 1)), // bosses get tougher faster than their minions
     speedMult: Math.min(1.4, 1 + 0.03 * i),
-    // +7% per level up to level 10, then +3%: lair monsters already hit harder by type.
+    // +7% per level up to level 10, then +3%: the lairs get their difficulty from their own
+    // monster mix, numbers and Kings (and full adaptation at that point) rather than this curve.
     dmgMult: i < 10 ? 1 + 0.07 * i : 1.63 + 0.03 * (i - 9),
     // Aimed shots grow more slowly (+5% per level): several shooters fire at once.
     shotMult: 1 + 0.05 * i,
