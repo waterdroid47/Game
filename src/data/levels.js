@@ -35,7 +35,7 @@ const LEVEL_DEFS = [
   },
   {
     name: 'Bone Crypt', boss: 'skeletonking', bg: { base: '#1c1818', dark: '#141111', light: '#6a5e54', deco: 'skulls' },
-    pool: { skeleton: 8, ghost: 2, bat: 2, golem: 1 }, countMult: 0.75, intervalMult: 1.6,
+    pool: { skeleton: 6, slime: 2, ghost: 2, bat: 1, golem: 1 }, countMult: 0.75, intervalMult: 1.9,
   },
   {
     name: 'Ogre Stronghold', boss: 'ogrewarlord', bg: { base: '#24180f', dark: '#1b120b', light: '#6a4422', deco: 'bricks' },
@@ -43,7 +43,7 @@ const LEVEL_DEFS = [
   },
   {
     name: "Dragon's Peak", boss: 'elderdragon', bg: { base: '#2a0a12', dark: '#1e070d', light: '#9a3020', deco: 'embers' },
-    pool: { whelp: 8, skeleton: 2, bat: 2, golem: 1 }, countMult: 0.8, intervalMult: 2.0, gems: 25,
+    pool: { whelp: 8, skeleton: 2, bat: 2, golem: 1 }, countMult: 0.8, intervalMult: 2.4, gems: 25,
   },
 ];
 
