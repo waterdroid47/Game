@@ -5,7 +5,7 @@ Add Romanian with **Manage translations → Add your own translations → Romani
 The graphics are in [`store/graphics/`](graphics/).
 
 ## Contact details
-- Email: SUPPORT_EMAIL_HERE
+- Email: pixelguard.support@gmail.com
 - Website: https://stately-cupcake-10ac98.netlify.app
 - Privacy policy: https://stately-cupcake-10ac98.netlify.app/privacy.html
 
@@ -81,4 +81,8 @@ Tags: Shooter, Tower defense, Roguelike, Pixel art, Offline.
 |------|------------------------------|
 | `graphics/icon-512.png` | App icon (512 × 512) |
 | `graphics/feature-graphic.png` | Feature graphic (1024 × 500) |
-| `graphics/screenshot-1.png` … `screenshot-6.png` | Phone screenshots (1080 × 1920) |
+| `graphics/screenshot-1.png` … `screenshot-8.png` | Phone screenshots (1080 × 1920), upload them in this order |
+
+The screenshots: 1 main menu · 2 a wave in the Slime Bog · 3 level-up cards · 4 the Red Dragon enraged,
+with meteor-rain warnings · 5 the Elder Dragon at Dragon's Peak · 6 the Monster Lairs page · 7 Nightmare mode ·
+8 the upgrade shop.
