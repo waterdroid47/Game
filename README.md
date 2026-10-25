@@ -93,7 +93,7 @@ All sprites are text pixel maps in `src/art/sprites/*.js`, one character per pix
   - Rewarded ads are optional and give rewards.
   - A skippable ad appears between every 2nd or 3rd finished level; none after any purchase.
   - EU players see the consent form first.
-  - Ad ids live in `src/data/ads.js`.
+  - Ad ids live in `src/data/ads.js` (the app id in `android/app/src/main/res/values/strings.xml`); `public/app-ads.txt` is AdMob's seller file for the website.
 - **Payments:** Google Play Billing, via `cordova-plugin-purchase`. Products are listed in `src/data/store.js`, and the code is in `src/services/monetization.js`.
 - **In the browser:** ads and payments are replaced by clearly labelled test dialogs.
 - **Publishing:** step-by-step Play Console instructions, store texts and graphics are in [`store/`](store/PLAY_CONSOLE_GUIDE.md). The privacy policy is `public/privacy.html`.
