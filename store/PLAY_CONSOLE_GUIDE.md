@@ -54,7 +54,8 @@ From now on every build is signed.
    - `pixel-guard-1.1.N.aab` → this is what you upload to Google Play;
    - `pixel-guard-1.1.N.apk` → install this directly on your phone to try it.
 3. Send the `.apk` to your phone and open it. Android asks to allow "Install unknown apps"; allow it.
-4. While the test ad ids are in use, ads show a **"Test Ad"** label. This is expected.
+4. The game uses your real AdMob ads. **Before playing it, add your phone as a test device**
+   (step 6, point 5): it then shows ads with a **"Test Ad"** label, and tapping them is safe.
    Purchases only work when the app is installed from Google Play (step 5).
 
 > Later, before installing the Play Store version on the same phone, uninstall this APK first
@@ -169,12 +170,15 @@ player has it on, may also bring back the whole save.
 3. **Privacy & messaging → European regulations (GDPR)** → create a message for Pixel Guard and **publish** it.
    This is the consent form that EU players see the first time they open the game. Without it, ads in the EU
    are very limited.
-4. Send Claude these 3 ids:
-   - **App ID**: `ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY` (with `~`);
-   - **Rewarded ad unit ID**: `ca-app-pub-XXXXXXXXXXXXXXXX/ZZZZZZZZZZ` (with `/`);
-   - **Interstitial ad unit ID**: `ca-app-pub-XXXXXXXXXXXXXXXX/WWWWWWWWWW` (with `/`).
+4. The 3 ids are in the game (done):
+   - **App ID** `ca-app-pub-8257165312390194~8402351079`, in `android/app/src/main/res/values/strings.xml`;
+   - **Rewarded** `ca-app-pub-8257165312390194/6039203777` and **Interstitial**
+     `ca-app-pub-8257165312390194/7819189305`, in `src/data/ads.js`.
 
-   Claude puts them in `src/data/ads.js` and `android/app/src/main/res/values/strings.xml`.
+   The website also has the **app-ads.txt** file AdMob asks for:
+   https://stately-cupcake-10ac98.netlify.app/app-ads.txt (`public/app-ads.txt`). AdMob checks it once the
+   app is public and linked to Google Play (step 8). It needs the same address in the store listing's
+   **Website** field.
 5. Never tap your own real ads: AdMob can close accounts for that. Add your phone as a test device:
    **Settings → Test devices**.
 

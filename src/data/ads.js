@@ -1,12 +1,12 @@
 // Google AdMob ad units used by the Android app (the browser version shows a fake test ad).
 //
-// These are Google's official TEST ids: they always show "Test Ad" and never earn money.
-// Before publishing, replace them with the ids of your own ad units
-// (admob.google.com → Apps → Pixel Guard → Ad units), and also replace the
-// app id in android/app/src/main/res/values/strings.xml (admob_app_id).
+// These are the real ad units of the Pixel Guard app in AdMob (admob.google.com → Apps →
+// Pixel Guard → Ad units); the app id is in android/app/src/main/res/values/strings.xml
+// (admob_app_id). To test on your own phone, add it in AdMob → Settings → Test devices:
+// it then gets test ads, and tapping them is safe.
 export const AD_UNITS = {
-  rewarded: 'ca-app-pub-3940256099942544/5224354917',
-  interstitial: 'ca-app-pub-3940256099942544/1033173712',
+  rewarded: 'ca-app-pub-8257165312390194/6039203777',
+  interstitial: 'ca-app-pub-8257165312390194/7819189305',
 };
 
 // True while the test ids above are in use.
