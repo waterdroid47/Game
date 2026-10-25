@@ -17,10 +17,10 @@ Product ids, texts and answers below must be typed **exactly** as written.
 
 ---
 
-## 1. Accounts (do this now)
+## 1. Accounts
 
-1. **Support email.** Create a new Gmail for the game, e.g. `pixelguard.support@gmail.com`.
-   It is shown publicly on Google Play. Send it to Claude, who puts it in the privacy policy and here.
+1. **Support email:** `pixelguard.support@gmail.com` (done). It is shown publicly on Google Play and is
+   already in the privacy policy and the store texts.
 2. **Google Play Console** – https://play.google.com/console/signup
    - Choose **Yourself** (personal account), pay the **$25** one-time fee.
    - Verify your identity (ID card) and your phone and email. This can take a few days.
@@ -50,9 +50,9 @@ From now on every build is signed.
 ## 3. Get the app and install it on your phone
 
 1. GitHub → **Actions** → **Android build** → the newest run on `main` (green ✓).
-2. At the bottom, under **Artifacts**, download `pixel-guard-1.0.N`. It is a zip; unzip it:
-   - `pixel-guard-1.0.N.aab` → this is what you upload to Google Play;
-   - `pixel-guard-1.0.N.apk` → install this directly on your phone to try it.
+2. At the bottom, under **Artifacts**, download `pixel-guard-1.1.N`. It is a zip; unzip it:
+   - `pixel-guard-1.1.N.aab` → this is what you upload to Google Play;
+   - `pixel-guard-1.1.N.apk` → install this directly on your phone to try it.
 3. Send the `.apk` to your phone and open it. Android asks to allow "Install unknown apps"; allow it.
 4. While the test ad ids are in use, ads show a **"Test Ad"** label. This is expected.
    Purchases only work when the app is installed from Google Play (step 5).
@@ -83,10 +83,10 @@ Then open **Dashboard** and complete every task under "Set up your app":
 | **Financial features** | My app doesn't provide any financial features |
 | **Health** | My app does not have any health features |
 | **Advertising ID** | **Yes**, the app uses the advertising ID. Purposes: Advertising or marketing, Analytics, Fraud prevention, security and compliance |
-| **Store listing** | texts from [`listing.md`](listing.md), graphics from [`graphics/`](graphics/). Category: **Action**. Contact email = your support email |
+| **Store listing** | texts from [`listing.md`](listing.md), graphics from [`graphics/`](graphics/). Category: **Action**. Contact email = `pixelguard.support@gmail.com` |
 
 ### Content rating
-Start the questionnaire (IARC). Email: your support email. Category: **Game**.
+Start the questionnaire (IARC). Email: `pixelguard.support@gmail.com`. Category: **Game**.
 - Violence: **Yes**. Fantasy violence only: cartoon monsters, no blood, no realistic people.
 - Fear / horror: No (cartoon ghosts and skeletons, not scary).
 - Sexuality, language, drugs/alcohol/tobacco, crude humour: No.
